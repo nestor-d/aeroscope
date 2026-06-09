@@ -39,9 +39,9 @@
     text-shadow:0 0 18px rgba(255,157,60,.25)}
   .brand b span{color:var(--cyan)}
   .brand small{color:var(--ink-faint);letter-spacing:2px;font-size:10px;text-transform:uppercase}
-  .conds{display:flex;gap:20px;margin-left:auto;align-items:center;flex-wrap:wrap}
-  .ctrl{display:flex;flex-direction:column;gap:3px;min-width:138px}
-  .ctrl label{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-dim);
+  .conds{display:flex;gap:13px;margin-left:auto;align-items:center;flex-wrap:wrap}
+  .ctrl{display:flex;flex-direction:column;gap:3px;min-width:104px}
+  .ctrl label{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ink-dim);
     display:flex;justify-content:space-between}
   .ctrl label b{color:var(--cyan);font-weight:600;font-family:var(--mono)}
   input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
@@ -135,6 +135,13 @@
     background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;cursor:pointer;user-select:none}
   .stp:hover{border-color:var(--cyan);color:var(--cyan)}
   .stp:active{background:var(--cyan);color:#0c1622}
+  .langtog{align-self:center;font-family:var(--mono);font-size:9px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--cyan);background:transparent;border:1px solid var(--cyan);border-radius:5px;padding:3px 9px;cursor:pointer;opacity:.85}
+  .langtog:hover{opacity:1;background:rgba(255,157,60,.12)}
+  .numin{width:46px;background:transparent;border:none;border-bottom:1px dashed var(--edge2);color:var(--cyan);
+    font-family:var(--mono);font-weight:600;font-size:inherit;padding:0 1px;text-align:right;-moz-appearance:textfield}
+  .numin:focus{outline:none;border-bottom-color:var(--cyan);background:rgba(255,157,60,.08)}
+  .numin::-webkit-inner-spin-button{opacity:.45}
 </style>
 </head>
 <body>
@@ -143,6 +150,7 @@
     <div class="brand">
       <b>AERO<span>SCOPE</span></b>
       <small>STL · Empirical Aero · v1</small>
+      <button class="langtog" id="bLang" title="Switch between plain-English and technical labels">View: Simple</button>
       <a class="kofi" href="https://ko-fi.com/nestorsplanesandships" target="_blank" rel="noopener">☕ Support on Ko-fi</a>
     </div>
     <div class="conds">
@@ -163,11 +171,11 @@
         <input id="sCg" type="range" min="-25" max="80" step="1" value="25">
       </div>
       <div class="ctrl">
-        <label>Mass (t) <b id="vW">10</b></label>
+        <label>Mass (t) <input type="number" id="vW" class="numin" min="0.5" max="400" step="0.5" value="10"></label>
         <div class="srow"><button class="stp" data-tgt="sW" data-dir="-1">−</button><input id="sW" type="range" min="0.5" max="400" step="0.5" value="10"><button class="stp" data-tgt="sW" data-dir="1">+</button></div>
       </div>
       <div class="ctrl">
-        <label>Static thrust (kN) <b id="vT">60</b></label>
+        <label>Static thrust (kN) <input type="number" id="vT" class="numin" min="0" max="1500" step="5" value="60"></label>
         <div class="srow"><button class="stp" data-tgt="sT" data-dir="-1">−</button><input id="sT" type="range" min="0" max="1500" step="5" value="60"><button class="stp" data-tgt="sT" data-dir="1">+</button></div>
       </div>
       <div class="ctrl" style="min-width:150px">
@@ -196,14 +204,14 @@
     <div class="stage" id="stage">
       <canvas id="gl"></canvas>
       <div class="hud" id="hud"></div>
-      <div class="hud" id="shockNote" style="top:auto;bottom:70px;display:none;pointer-events:none"></div>
+      <div class="hud" id="shockNote" style="top:80px;display:none;pointer-events:none"></div>
       <div class="markers" id="markers">
         <span class="mlab">Reference points</span>
         <label><input type="checkbox" id="mk_cg"><i style="background:#ffb454;color:#ffb454"></i>CG <b id="mkv_cg">—</b></label>
         <label><input type="checkbox" id="mk_ac"><i style="background:#34e6d6;color:#34e6d6"></i>AC <b id="mkv_ac">—</b></label>
         <label><input type="checkbox" id="mk_cp"><i style="background:#ff6bd0;color:#ff6bd0"></i>CP <b id="mkv_cp">—</b></label>
         <label style="border-top:1px solid var(--edge2);padding-top:5px;margin-top:2px"><input type="checkbox" id="mk_area"><i style="background:#ff9d3c;color:#ff9d3c"></i>Area dist.</label>
-        <label><input type="checkbox" id="mk_shock"><i style="background:#ff5d6c;color:#ff5d6c"></i>Flow geom</label>
+        <label><input type="checkbox" id="mk_shock" title="Shows the Mach cone and shock-wave geometry over the model. Mach angle and shock angle are kept as technical terms because plain-language renames would be inaccurate."><i style="background:#ff5d6c;color:#ff5d6c"></i>Flow geom</label>
       </div>
       <div class="stamp" id="stamp"></div>
       <div class="cbar" id="cbar" style="display:none">
@@ -328,8 +336,8 @@
         <h3>Radar Cross-Section <i>monostatic</i></h3>
         <div class="body">
           <div style="display:flex;gap:6px;margin-bottom:9px">
-            <button class="btn ghost rcsmode" data-m="proj" style="flex:1;font-size:10px;padding:5px 6px">Projected</button>
-            <button class="btn ghost rcsmode" data-m="sbr" style="flex:1;font-size:10px;padding:5px 6px">Ray-trace</button>
+            <button class="btn ghost rcsmode" data-m="proj" title="Fast estimate: how much flat surface faces the radar from each angle. Shows broad exposure, but not sharp reflection spikes, edge effects, or frequency." style="flex:1;font-size:10px;padding:5px 6px">Projected</button>
+            <button class="btn ghost rcsmode" data-m="sbr" title="Slower, more detailed: bounces rays off the surfaces (including multi-bounce corner reflections) to find the actual reflection spikes. Closer to real radar behaviour. Press Compute to run." style="flex:1;font-size:10px;padding:5px 6px">Ray-trace</button>
           </div>
           <button class="btn ghost" id="bEdge" style="width:100%;font-size:10px;padding:5px 6px;margin-bottom:9px">◇ Edge-alignment overlay</button>
           <div class="ctrl" id="rcsProjCtrls" style="margin-bottom:9px">
@@ -346,11 +354,11 @@
           </div>
           <div id="sbrCtrls" style="display:none;margin-bottom:9px">
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
-              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">BAND <select id="sbrBand" style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option value="1.5">VHF</option><option value="0.23">L</option><option value="0.1">S</option><option value="0.05">C</option><option value="0.03" selected>X</option><option value="0.02">Ku</option></select></label>
-              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">BOUNCES <select id="sbrBounce" style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option>1</option><option selected>2</option><option>3</option></select></label>
-              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">RAYS <select id="sbrDens" style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option value="24">Coarse</option><option value="36" selected>Medium</option><option value="52">Fine</option></select></label>
+              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">BAND <select id="sbrBand" title="Radar frequency band, low to high: VHF, L, S, C, X, Ku. Higher bands have shorter wavelengths and see finer detail; X-band is typical for fighter radar." style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option value="1.5">VHF</option><option value="0.23">L</option><option value="0.1">S</option><option value="0.05">C</option><option value="0.03" selected>X</option><option value="0.02">Ku</option></select></label>
+              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">BOUNCES <select id="sbrBounce" title="How many times a ray reflects before returning. More bounces capture corner and cavity returns (e.g. intakes), at higher cost." style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option>1</option><option selected>2</option><option>3</option></select></label>
+              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">RAYS <select id="sbrDens" title="Ray-grid density. Finer = more accurate but slower." style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option value="24">Coarse</option><option value="36" selected>Medium</option><option value="52">Fine</option></select></label>
             </div>
-            <div class="ctrl" style="margin-bottom:7px"><label>Reflectivity <b id="vSbrR">1.00</b></label><input id="sbrRefl" type="range" min="0.1" max="1" step="0.05" value="1"></div>
+            <div class="ctrl" style="margin-bottom:7px"><label>Reflectivity <b id="vSbrR">1.00</b></label><input id="sbrRefl" title="Surface reflectivity: 1.0 = bare metal, lower mimics radar-absorbing material (RAM). A crude broadband stand-in, not a real coating model." type="range" min="0.1" max="1" step="0.05" value="1"></div>
             <button class="btn" id="bSbr" style="font-size:10px;padding:6px 10px;width:100%">Compute ray-trace RCS</button>
           </div>
           <canvas class="chart" id="rcsPolar" height="240"></canvas>
@@ -965,6 +973,9 @@ function updateShockOverlay(G,M){ensureShockOv();
   const note=$('shockNote');
   if(M<=1.0){if(note)note.innerHTML='FLOW GEOM<br>M\u22641 \u00b7 no Mach cone';return;}
   const sc=2/Math.max(G.Llen,G.Sext,G.Vext),apexX=(0-G.Llen/2)*sc,Lc=G.Llen*sc*1.35,mu=machAngle(M);
+  let _lo=1e30,_hi=-1e30;for(const t of G.tris)for(const vx of t){if(vx[0]<_lo)_lo=vx[0];if(vx[0]>_hi)_hi=vx[0];}
+  const _bnd=_lo+0.05*(_hi-_lo);let _sv=0,_ss=0,_n=0;for(const t of G.tris)for(const vx of t){if(vx[0]<=_bnd){_sv+=vx[2];_ss+=vx[1];_n++;}}
+  SHOCKOV.group.position.set(0,(_n?_sv/_n:0)*sc,(_n?_ss/_n:0)*sc);
   const mc=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x6f8aa3,transparent:true,opacity:0.45,depthTest:false}));
   mc.geometry.setAttribute('position',new THREE.BufferAttribute(coneLineSeg(apexX,mu,Lc),3));SHOCKOV.group.add(mc);
   const dN=noseSemiAngle(G),sh=obliqueBeta(dN*_R2D,M);
@@ -1102,7 +1113,7 @@ function drawEnvelope(cfg){
     }}
   x.fillStyle='#42566b';x.font='9px IBM Plex Mono';
   for(let M=0.5;M<=M1+1e-6;M+=0.5){const px=m.l+(M-M0)/(M1-M0)*pw;x.fillText('M'+M.toFixed(1),px-9,H-7);}
-  for(let a=0;a<=24;a+=6){const py=H-m.b-(a*1000-A0)/(A1-A0)*ph;x.fillText(a+'k',5,py+3);}
+  for(let a=0;a<=24;a+=6){const py=H-m.b-(a*1000-A0)/(A1-A0)*ph;x.fillText(a+'km',3,py+3);}
   const nx=m.l+(Math.min(Math.max(cfg.M,M0),M1)-M0)/(M1-M0)*pw;
   const ny=H-m.b-(Math.min(Math.max(cfg.alt,A0),A1)-A0)/(A1-A0)*ph;
   x.fillStyle='#ffd166';x.strokeStyle='#1a1208';x.lineWidth=1.5;x.beginPath();x.arc(nx,ny,5,0,7);x.fill();x.stroke();
@@ -1403,7 +1414,7 @@ function recompute(){
   else if(sm>=0&&sm<=35){p.className='pill warn';p.textContent=(sm<3?'MARGINAL ':'STIFF ')+sm.toFixed(1)+'%';}
   else{p.className='pill bad';p.textContent=(sm<0?'UNSTABLE ':'OVER-STIFF ')+sm.toFixed(1)+'%';}
   // hud
-  $('hud').innerHTML=`MODE <b>${F.sup?'SUPERSONIC':'SUBSONIC'}</b><br>MACH <b>${M.toFixed(2)}</b> · ALT <b>${(alt/1000).toFixed(1)} km</b><br>AOA <b>${aoa.toFixed(1)}°</b> · Cp_max <b>${F.Cpmax.toFixed(2)}</b>`;
+  $('hud').innerHTML=SIMPLE?`<b>${F.sup?'SUPERSONIC':'SUBSONIC'}</b><br>Speed <b>Mach ${M.toFixed(2)}</b> · <b>${(alt/1000).toFixed(1)} km</b> up<br>Nose-up <b>${aoa.toFixed(1)}°</b>`:`MODE <b>${F.sup?'SUPERSONIC':'SUBSONIC'}</b><br>MACH <b>${M.toFixed(2)}</b> · ALT <b>${(alt/1000).toFixed(1)} km</b><br>AOA <b>${aoa.toFixed(1)}°</b> · Cp_max <b>${F.Cpmax.toFixed(2)}</b>`;
   if($('mk_shock').checked&&GEO)updateShockOverlay(GEO,M);
   $('stamp').innerHTML=`L/D <b>${R.ld.toFixed(1)}</b><br>SM <b>${(R.SM*100).toFixed(1)}%</b>`;
   // method note
@@ -1496,7 +1507,7 @@ function trimToLevel(){
 }
 function updateForces(){
   const massT=+$('sW').value, Tstatic=+$('sT').value, type=$('engType').value;
-  $('vW').textContent=massT; $('vT').textContent=Tstatic;
+  $('vW').value=massT; $('vT').value=Tstatic;
   const W_kN=massT*G0;                              // weight (kN) = mass(t)*g
   let Tdyn=Tstatic, note='set Mach / altitude to estimate installed thrust';
   if(LASTTDYN!=null){
@@ -1543,6 +1554,8 @@ function stepSlider(id,dir){const s=$(id);const step=parseFloat(s.step)||1,min=p
   let v=parseFloat(s.value)+dir*step;v=Math.max(min,Math.min(max,Math.round(v/step)*step));
   s.value=v;s.dispatchEvent(new Event('input',{bubbles:true}));}
 document.querySelectorAll('.stp').forEach(b=>b.addEventListener('click',()=>stepSlider(b.dataset.tgt,+b.dataset.dir)));
+function bindNum(numId,sldId){const n=$(numId),sl=$(sldId);n.addEventListener('change',()=>{let v=parseFloat(n.value);if(isNaN(v)){n.value=sl.value;return;}v=Math.max(+sl.min,Math.min(+sl.max,v));sl.value=v;sl.dispatchEvent(new Event('input',{bubbles:true}));n.value=sl.value;});}
+bindNum('vW','sW');bindNum('vT','sT');
 $('engType').addEventListener('change',recompute);
 $('axis').addEventListener('change',rebuild);
 $('nose').addEventListener('change',rebuild);
@@ -1581,7 +1594,7 @@ function applyState(st){
   $('vAoa').textContent=(+$('sAoa').value).toFixed(1)+'°';
   $('vCg').textContent=$('sCg').value+'%';
   $('vWd').textContent=(+$('sWd').value).toFixed(2);
-  $('vW').textContent=$('sW').value; $('vT').textContent=$('sT').value;
+  $('vW').value=$('sW').value; $('vT').value=$('sT').value;
   if($('peakLab'))$('peakLab').textContent='peak '+(IDEALPEAK<0.55?'0.50':'0.67')+'L';
   if(RAWTRIS)rebuild(); else if(GEO)recompute();   // rebuild re-analyzes with restored axis/nose
 }
@@ -1613,7 +1626,7 @@ function autoScaleWave(){
 }
 $('bAutoWd').addEventListener('click',autoScaleWave);
 $('bLoadWd').addEventListener('click',()=>{
-  if(WDTABLE){WDTABLE=null;$('wdTabNote').textContent='';$('bLoadWd').textContent='↧ load .json';$('bCompWd').textContent='⚙ Compute Jones DqW(M)';recompute();}
+  if(WDTABLE){WDTABLE=null;$('wdTabNote').textContent='';setBtn('bLoadWd','off');setBtn('bCompWd','off');recompute();}
   else $('wdFile').click();
 });
 $('wdFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
@@ -1621,18 +1634,18 @@ $('wdFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return
     if(!Array.isArray(j.mach)||!Array.isArray(j.shape)||j.mach.length!==j.shape.length||j.mach.length<2)throw 0;
     WDTABLE={mach:j.mach.map(Number),shape:j.shape.map(Number)};
     $('wdTabNote').innerHTML='Jones table M'+j.mach[0]+'–'+j.mach[j.mach.length-1]+' · '+j.mach.length+' pts · click to clear';
-    $('bLoadWd').textContent='✕ Jones DqW(M)';
+    setBtn('bLoadWd','on');
     recompute();
   }catch(_){$('wdTabNote').textContent='invalid table JSON';}};
   rd.readAsText(f);e.target.value='';});
 $('bCompWd').addEventListener('click',()=>{
   if(!GEO){$('wdTabNote').textContent='load a model first';return;}
-  if(WDTABLE){WDTABLE=null;$('bCompWd').textContent='⚙ Compute Jones DqW(M)';$('bLoadWd').textContent='↧ load .json';$('wdTabNote').textContent='';$('wdTabNote').style.color='var(--cyan)';recompute();return;}
+  if(WDTABLE){WDTABLE=null;setBtn('bCompWd','off');setBtn('bLoadWd','off');$('wdTabNote').textContent='';$('wdTabNote').style.color='var(--cyan)';recompute();return;}
   $('spin').classList.add('on');$('spinTxt').textContent='JONES WAVE DRAG';
   setTimeout(()=>{let tab=null;try{tab=computeJonesTable();}catch(_){}
     $('spin').classList.remove('on');
     if(!tab){$('wdTabNote').textContent='compute failed';return;}
-    WDTABLE={mach:tab.mach,shape:tab.shape};$('bCompWd').textContent='✕ Jones DqW(M) on';
+    WDTABLE={mach:tab.mach,shape:tab.shape};setBtn('bCompWd','on');
     if(tab.badFrac>0.05){$('wdTabNote').innerHTML='⚠ mesh not watertight ('+Math.round(tab.badFrac*100)+'% open cuts) — enable Voxel cleanup & recompute; result unreliable';$('wdTabNote').style.color='var(--red)';}
     else{$('wdTabNote').innerHTML='Jones M'+tab.mach[0]+'–'+tab.mach[tab.mach.length-1]+' · computed in-browser (exact sections)';$('wdTabNote').style.color='var(--cyan)';}
     recompute();
@@ -1701,13 +1714,14 @@ function slotSetup(){
   function mkSlot(idx){
     const slot=document.createElement('div');slot.className='card slotCard';
     const sel=document.createElement('select');sel.className='slotSel';
-    meta.forEach(m=>{const o=document.createElement('option');o.value=m.key;o.textContent=m.name;sel.appendChild(o);});
+    meta.forEach(m=>{const o=document.createElement('option');o.value=m.key;o.textContent=SIMPLE?(CARD_SIMPLE[m.name]||m.name):m.name;sel.appendChild(o);});
     const body=document.createElement('div');body.className='slotBody';
     slot.appendChild(sel);slot.appendChild(body);side.insertBefore(slot,pool);
     sel.addEventListener('change',()=>selectCard(idx,sel.value));
     SLOTSEL[idx]=sel;SLOTBODY[idx]=body;
   }
   mkSlot(0);mkSlot(1);
+  window.__relabelCards=function(){[SLOTSEL[0],SLOTSEL[1]].forEach(sel=>{if(sel)[...sel.options].forEach(o=>{const m=CARDMAP[o.value];if(m)o.textContent=SIMPLE?(CARD_SIMPLE[m.name]||m.name):m.name;});});};
   const findKey=nm=>{const m=meta.find(x=>x.name.toLowerCase().startsWith(nm));return m?m.key:null;};
   const d0=findKey('performance')||meta[0].key;
   let d1=findKey('drag vs mach')||findKey('flight envelope')||meta[1].key;
@@ -1716,8 +1730,31 @@ function slotSetup(){
   SLOTKEY[1]=d1;SLOTBODY[1].appendChild(CARDMAP[d1].el);SLOTSEL[1].value=d1;
   redraw();
 }
+/* ===== Simple / Technical language toggle ===== */
+let SIMPLE=true; try{SIMPLE=(localStorage.getItem('aeroLang')!=='tech');}catch(e){}
+const CARD_SIMPLE={'Geometry':'Shape & size','Performance':'Performance','Drag Polar':'Lift vs drag','Area Distribution':'Cross-section area','Stability':'Stability','Method & Limits':'How it works','Drag vs Mach':'Drag vs speed','Flight Envelope':'Flight envelope','Reference Compare':'Compare to real jets','Radar Cross-Section':'Radar stealth','Design State':'Save / load setup'};
+const TR_LABEL=[['vMach','Mach','Speed (Mach)'],['vAoa','Angle of Attack','Nose-up angle'],['vCg','CG (% body L)','Balance point'],['vW','Mass (t)','Weight (t)'],['vT','Static thrust (kN)','Engine thrust (kN)'],['vWd','Wave drag \u00d7','Shockwave drag \u00d7']];
+const TR_BTN=[['bLoad','Load STL','Load 3D model'],['bAutoWd','fit','Auto']];
+const TR_CHK=[['mk_cg','CG','Balance point'],['mk_ac','AC','Lift center'],['mk_cp','CP','Pressure center'],['mk_area','Area dist.','Cross-section'],['mk_shock','Flow geom','Shockwaves']];
+const BTNLBL={bCompWd:{off:['\u2699 Compute Jones DqW(M)','\u2699 Compute shockwave drag'],on:['\u2715 Jones DqW(M) on','\u2715 Shockwave drag on']},bLoadWd:{off:['\u21a7 load .json','\u21a7 Load drag file'],on:['\u2715 Jones DqW(M)','\u2715 Shockwave drag']}};
+function setBtn(id,state){const el=$(id);if(!el)return;el.dataset.state=state;const p=BTNLBL[id][state];el.textContent=SIMPLE?p[1]:p[0];}
+function _firstText(el){return [...el.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());}
+function _lastText(el){return [...el.childNodes].reverse().find(n=>n.nodeType===3&&n.textContent.trim());}
+function applyLang(){
+  document.body.classList.toggle('lang-simple',SIMPLE);
+  TR_LABEL.forEach(([id,t,sm])=>{const v=$(id);if(v&&v.parentNode){const tn=_firstText(v.parentNode);if(tn)tn.textContent=(SIMPLE?sm:t)+' ';}});
+  TR_BTN.forEach(([id,t,sm])=>{const el=$(id);if(el)el.textContent=SIMPLE?sm:t;});
+  TR_CHK.forEach(([id,t,sm])=>{const el=$(id);if(el){const lab=el.closest('label');if(lab){const tn=_lastText(lab);if(tn)tn.textContent=SIMPLE?sm:t;}}});
+  Object.keys(BTNLBL).forEach(id=>{const el=$(id);if(el)setBtn(id,el.dataset.state||'off');});
+  if(window.__relabelCards)window.__relabelCards();
+  const bl=$('bLang');if(bl)bl.textContent=SIMPLE?'View: Simple':'View: Technical';
+  try{recompute();}catch(e){}
+  try{if(typeof RCSDATA!=='undefined'&&RCSDATA)drawRCS();}catch(e){}
+}
+$('bLang').addEventListener('click',()=>{SIMPLE=!SIMPLE;try{localStorage.setItem('aeroLang',SIMPLE?'simple':'tech');}catch(e){}applyLang();});
 initGL();
 slotSetup();
+applyLang();
 </script>
 </body>
 </html>
