@@ -1,0 +1,1708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AEROSCOPE — STL Aerodynamic Analyzer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root{
+    --bg:#070b11; --bg2:#0c121b; --panel:#0e1622; --panel2:#111c2b;
+    --edge:#1d2c40; --edge2:#273c57; --grid:#13202f;
+    --ink:#cde2f2; --ink-dim:#6f8aa3; --ink-faint:#42566b;
+    --cyan:#ff9d3c; --cyan-d:#c96a12; --amber:#ffd166; --red:#ff5d6c;
+    --good:#54e08a; --warn:#ffb454; --bad:#ff5d6c;
+    --mono:'IBM Plex Mono',monospace; --disp:'Chakra Petch',sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -10%, #11202f 0%, transparent 55%),
+      radial-gradient(900px 600px at -5% 110%, #0c1a1e 0%, transparent 50%),
+      var(--bg);
+    color:var(--ink); font-family:var(--mono); font-size:13px; overflow:hidden;
+  }
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:9999;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px);opacity:.5}
+  .app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100vh;overflow:hidden}
+  /* ---- header ---- */
+  header{
+    display:flex;align-items:center;gap:22px;padding:11px 18px;
+    background:linear-gradient(180deg,#0d1622,#0a121b);
+    border-bottom:1px solid var(--edge2);
+  }
+  .brand{display:flex;align-items:baseline;gap:11px;font-family:var(--disp)}
+  .brand b{font-size:22px;font-weight:700;letter-spacing:5px;color:var(--ink);
+    text-shadow:0 0 18px rgba(255,157,60,.25)}
+  .brand b span{color:var(--cyan)}
+  .brand small{color:var(--ink-faint);letter-spacing:2px;font-size:10px;text-transform:uppercase}
+  .conds{display:flex;gap:20px;margin-left:auto;align-items:center;flex-wrap:wrap}
+  .ctrl{display:flex;flex-direction:column;gap:3px;min-width:138px}
+  .ctrl label{font-size:9.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-dim);
+    display:flex;justify-content:space-between}
+  .ctrl label b{color:var(--cyan);font-weight:600;font-family:var(--mono)}
+  input[type=range]{-webkit-appearance:none;appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,var(--cyan-d),var(--edge2));outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:2px;
+    background:var(--cyan);box-shadow:0 0 8px rgba(255,157,60,.7);cursor:pointer;transform:rotate(45deg)}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:2px;border:none;background:var(--cyan)}
+  .btn{font-family:var(--disp);letter-spacing:1.5px;font-weight:600;font-size:12px;
+    background:linear-gradient(180deg,#143041,#0e2230);color:var(--cyan);
+    border:1px solid var(--cyan-d);border-radius:4px;padding:9px 16px;cursor:pointer;
+    text-transform:uppercase;transition:.15s;white-space:nowrap}
+  .btn:hover{background:var(--cyan);color:#04141a;box-shadow:0 0 16px rgba(255,157,60,.4)}
+  .btn.ghost{color:var(--ink-dim);border-color:var(--edge2);background:transparent}
+  .btn.ghost:hover{color:var(--ink);background:#0e1a26;box-shadow:none}
+  select{font-family:var(--mono);background:#0c1622;color:var(--ink);border:1px solid var(--edge2);
+    border-radius:4px;padding:7px 8px;font-size:12px;cursor:pointer}
+  /* ---- main ---- */
+  main{display:grid;grid-template-columns:1fr 372px;min-height:0}
+  .stage{position:relative;border-right:1px solid var(--edge2);min-width:0;overflow:hidden;min-height:0;
+    background:radial-gradient(900px 700px at 50% 40%, #0b1623 0%, #070b11 80%)}
+  #gl{display:block;width:100%;height:100%}
+  .hud{position:absolute;left:16px;top:14px;font-size:10.5px;letter-spacing:1px;color:var(--ink-dim);
+    line-height:1.7;pointer-events:none;text-transform:uppercase}
+  .hud b{color:var(--cyan);font-weight:600}
+  .stamp{position:absolute;right:16px;top:14px;text-align:right;font-size:10px;color:var(--ink-faint);
+    letter-spacing:1px;pointer-events:none;line-height:1.7}
+  .stamp b{color:var(--amber)}
+  .cbar{position:absolute;left:50%;transform:translateX(-50%);bottom:16px;display:flex;flex-direction:column;
+    align-items:center;gap:5px;pointer-events:none}
+  .cbar .scale{width:300px;height:11px;border-radius:2px;border:1px solid var(--edge2)}
+  .cbar .ticks{display:flex;justify-content:space-between;width:312px;font-size:10px;color:var(--ink-dim)}
+  .cbar .cap{font-size:9.5px;letter-spacing:2px;text-transform:uppercase;color:var(--ink-faint)}
+  .markers{position:absolute;left:16px;bottom:14px;display:flex;flex-direction:column;gap:3px;background:rgba(10,18,26,.6);border:1px solid var(--edge2);border-radius:6px;padding:6px 9px;font-size:9.5px;letter-spacing:1px}
+  .markers .mlab{font-size:9px;letter-spacing:2px;color:var(--ink-faint);text-transform:uppercase;margin-bottom:1px}
+  .markers label{display:flex;align-items:center;gap:7px;color:var(--ink-dim);cursor:pointer;text-transform:uppercase}
+  .markers label i{width:10px;height:10px;border-radius:50%;display:inline-block;box-shadow:0 0 6px currentColor}
+  .markers label b{margin-left:auto;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums;padding-left:8px}
+  .markers input{accent-color:var(--cyan);cursor:pointer}
+  .drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(7,11,17,.86);border:2px dashed var(--cyan);z-index:20;
+    font-family:var(--disp);letter-spacing:3px;color:var(--cyan);font-size:20px}
+  .drop.on{display:flex}
+  .spin{position:absolute;inset:0;display:none;flex-direction:column;gap:14px;align-items:center;justify-content:center;
+    background:rgba(7,11,17,.6);z-index:15;font-family:var(--disp);letter-spacing:3px;color:var(--cyan)}
+  .spin.on{display:flex}
+  .spin .ring{width:42px;height:42px;border:3px solid var(--edge2);border-top-color:var(--cyan);
+    border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* ---- side panel ---- */
+  .side{overflow-y:auto;min-height:0;height:100%;padding:14px 14px 30px;display:flex;flex-direction:column;gap:10px;background:var(--bg2)}
+  .side::-webkit-scrollbar{width:8px}.side::-webkit-scrollbar-thumb{background:var(--edge2);border-radius:4px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--edge);border-radius:7px;overflow:hidden;flex:0 0 auto}
+  .card h3{margin:0;padding:7px 13px;font-family:var(--disp);font-size:11px;letter-spacing:2.5px;text-transform:uppercase;
+    color:var(--ink-dim);border-bottom:1px solid var(--edge);display:flex;justify-content:space-between;align-items:center;
+    background:linear-gradient(180deg,#101b29,#0c1521)}
+  .card h3 i{font-style:normal;color:var(--cyan);font-size:9px;letter-spacing:1px}
+  .card .body{padding:9px 12px}
+  .rows{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:baseline}
+  .rows .k{color:var(--ink-dim);font-size:11px;letter-spacing:.5px}
+  .rows .v{text-align:right;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rows .v u{color:var(--ink-faint);text-decoration:none;font-weight:400;font-size:10px;margin-left:2px}
+  .rows .v.hi{color:var(--cyan)} .rows .v.am{color:var(--amber)}
+  .big{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+  .stat{flex:1;min-width:84px;background:#0a131e;border:1px solid var(--edge);border-radius:6px;padding:8px 10px}
+  .stat .lab{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink-faint)}
+  .stat .num{font-size:21px;font-weight:600;color:var(--cyan);font-variant-numeric:tabular-nums;line-height:1.15}
+  .stat .num.am{color:var(--amber)} .stat .num small{font-size:11px;color:var(--ink-dim)}
+  canvas.chart{width:100%;display:block;border-radius:4px}
+  .pill{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid currentColor;letter-spacing:1px}
+  .pill.good{color:var(--good)} .pill.warn{color:var(--warn)} .pill.bad{color:var(--bad)}
+  .note{font-size:10px;color:var(--ink-faint);line-height:1.6;letter-spacing:.3px;padding:2px 1px}
+  .note b{color:var(--amber)}
+  .axsel{display:flex;gap:6px;align-items:center;font-size:10px;color:var(--ink-dim);letter-spacing:1px;text-transform:uppercase}
+  .empty{margin:auto;text-align:center;color:var(--ink-faint);font-family:var(--disp);letter-spacing:3px}
+  .empty span{font-size:46px;display:block;margin-bottom:8px;opacity:.4}
+  .legend{display:flex;gap:12px;font-size:10px;color:var(--ink-dim);margin-top:6px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:4px}
+  .slotCard{padding:0}
+  .slotSel{width:100%;border:0;border-bottom:1px solid var(--edge);border-radius:0;background:var(--panel);color:var(--ink);
+    font-family:var(--disp);font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:8px 13px;cursor:pointer}
+  .slotSel:focus{outline:none;color:var(--cyan)}
+  .side .slotBody>.card{border:0;border-radius:0;background:none}
+  .side .slotBody .card h3{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <b>AERO<span>SCOPE</span></b>
+      <small>STL · Empirical Aero · v1</small>
+    </div>
+    <div class="conds">
+      <div class="ctrl">
+        <label>Mach <b id="vMach">0.80</b></label>
+        <input id="sMach" type="range" min="0.1" max="4" step="0.05" value="0.8">
+      </div>
+      <div class="ctrl">
+        <label>Altitude <b id="vAlt">11.0 km</b></label>
+        <input id="sAlt" type="range" min="0" max="20000" step="250" value="11000">
+      </div>
+      <div class="ctrl">
+        <label>Angle of Attack <b id="vAoa">4.0°</b></label>
+        <input id="sAoa" type="range" min="-6" max="18" step="0.5" value="4">
+      </div>
+      <div class="ctrl">
+        <label>CG (% body L) <b id="vCg">25%</b></label>
+        <input id="sCg" type="range" min="-25" max="80" step="1" value="25">
+      </div>
+      <div class="ctrl">
+        <label>Mass (t) <b id="vW">10</b></label>
+        <input id="sW" type="range" min="0.5" max="400" step="0.5" value="10">
+      </div>
+      <div class="ctrl">
+        <label>Static thrust (kN) <b id="vT">60</b></label>
+        <input id="sT" type="range" min="0" max="1500" step="5" value="60">
+      </div>
+      <div class="ctrl" style="min-width:150px">
+        <label>Engine</label>
+        <select id="engType">
+          <option value="high">High-bypass turbofan</option>
+          <option value="low">Low-bypass / turbojet</option>
+          <option value="prop">Propeller / turboprop</option>
+        </select>
+      </div>
+      <div class="ctrl" style="min-width:158px">
+        <label>Wave drag × <b id="vWd">1.00</b> <button id="bAutoWd" class="btn ghost" style="font-size:9px;padding:2px 7px;margin-left:4px;letter-spacing:1px" title="Scale wave drag so the design's wave-drag-to-Sears-Haack ratio lands in the physically plausible 1.5–2× band">fit</button></label>
+        <input id="sWd" type="range" min="0.2" max="1.8" step="0.05" value="1">
+        <div id="wdCalNote" style="font-size:9px;color:var(--ink-faint);letter-spacing:.3px;min-height:11px;margin-top:2px"></div>
+        <button class="btn ghost" id="bCompWd" style="font-size:9px;padding:2px 7px;letter-spacing:.5px">⚙ Compute Jones DqW(M)</button>
+        <button class="btn ghost" id="bLoadWd" style="font-size:9px;padding:2px 7px;letter-spacing:.5px">↧ load .json</button>
+        <input type="file" id="wdFile" accept=".json,application/json" style="display:none">
+        <div id="wdTabNote" style="font-size:9px;color:var(--cyan);letter-spacing:.3px;min-height:11px;margin-top:2px"></div>
+      </div>
+      <button class="btn" id="bLoad">Load STL</button>
+      <button class="btn ghost" id="bDemo">Demo Jet</button>
+      <input id="file" type="file" accept=".stl" hidden>
+    </div>
+  </header>
+  <main>
+    <div class="stage" id="stage">
+      <canvas id="gl"></canvas>
+      <div class="hud" id="hud"></div>
+      <div class="hud" id="shockNote" style="top:auto;bottom:70px;display:none;pointer-events:none"></div>
+      <div class="markers" id="markers">
+        <span class="mlab">Reference points</span>
+        <label><input type="checkbox" id="mk_cg"><i style="background:#ffb454;color:#ffb454"></i>CG <b id="mkv_cg">—</b></label>
+        <label><input type="checkbox" id="mk_ac"><i style="background:#34e6d6;color:#34e6d6"></i>AC <b id="mkv_ac">—</b></label>
+        <label><input type="checkbox" id="mk_cp"><i style="background:#ff6bd0;color:#ff6bd0"></i>CP <b id="mkv_cp">—</b></label>
+        <label style="border-top:1px solid var(--edge2);padding-top:5px;margin-top:2px"><input type="checkbox" id="mk_area"><i style="background:#ff9d3c;color:#ff9d3c"></i>Area dist.</label>
+        <label><input type="checkbox" id="mk_shock"><i style="background:#ff5d6c;color:#ff5d6c"></i>Flow geom</label>
+      </div>
+      <div class="stamp" id="stamp"></div>
+      <div class="cbar" id="cbar" style="display:none">
+        <div class="cap" id="cbarCap">Pressure coefficient Cp</div>
+        <div class="scale" id="cbarScale"></div>
+        <div class="ticks"><span id="cbLo"></span><span>0</span><span id="cbHi"></span></div>
+      </div>
+      <div class="drop" id="drop">DROP STL FILE</div>
+      <div class="spin" id="spin"><div class="ring"></div><div id="spinTxt">ANALYZING</div></div>
+      <div class="empty" id="empty"><span>✈</span>LOAD AN STL OR TRY THE DEMO JET</div>
+    </div>
+    <div class="side" id="side">
+      <div class="card">
+        <h3>Geometry <i id="triCount">—</i></h3>
+        <div class="body">
+          <div class="axsel" style="margin-bottom:9px">
+            Longitudinal axis
+            <select id="axis"><option value="auto">auto (longest)</option><option>X</option><option>Y</option><option>Z</option></select>
+            <span style="margin-left:auto">nose</span>
+            <select id="nose"><option value="min">−end</option><option value="max">+end</option></select>
+          </div>
+          <div class="axsel" style="margin-bottom:9px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0">
+              <input type="checkbox" id="vox" style="accent-color:var(--cyan)"> Voxel cleanup
+            </label>
+            <span style="margin-left:auto">res <b id="voxResV" style="color:var(--cyan)">88</b></span>
+            <input id="voxRes" type="range" min="48" max="148" step="4" value="88" style="width:84px">
+          </div>
+          <div class="rows" id="geoRows"><div class="k">—</div><div class="v">—</div></div>
+          <div class="note" id="voxNote" style="margin-top:7px"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Performance <i>empirical buildup</i></h3>
+        <div class="body">
+          <div class="big">
+            <div class="stat"><div class="lab">L/D max</div><div class="num" id="ldmax">—</div></div>
+            <div class="stat"><div class="lab">CL @ L/D max</div><div class="num am" id="clopt">—</div></div>
+            <div class="stat"><div class="lab">T / W</div><div class="num" id="tw">—</div></div>
+            <div class="stat"><div class="lab">T / D</div><div class="num" id="td">—</div></div>
+            <div class="stat"><div class="lab">L / W</div><div class="num am" id="lw">—</div></div>
+            <div class="stat"><div class="lab">Flight path γ</div><div class="num" id="fpa">—</div></div>
+          </div>
+          <div id="thrustNote" style="font-size:10px;letter-spacing:.5px;color:var(--ink-faint);margin:-2px 0 4px">—</div>
+          <div id="fpaNote" style="font-size:10px;letter-spacing:.5px;color:var(--ink-faint);margin:0 0 8px"></div>
+          <button class="btn ghost" id="bTrim" style="font-size:10px;padding:5px 10px;letter-spacing:1.5px">⟳ Trim to level (L/W → 1)</button>
+          <div class="rows" id="perfRows"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Drag Polar <i id="polarCond">—</i></h3>
+        <div class="body">
+          <canvas class="chart" id="polar" height="210"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--cyan)"></i>CD vs CL</span>
+            <span><i style="background:var(--amber)"></i>operating point</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Area Distribution <i>Whitcomb / Sears-Haack</i></h3>
+        <div class="body">
+          <canvas class="chart" id="area" height="160"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--cyan)"></i>S(x) model</span>
+            <span><i style="background:var(--ink-dim)"></i>ideal · <b id="peakLab">peak 0.67L</b></span>
+            <select id="idealPeak" style="margin-left:auto;font-size:9px;padding:2px 5px">
+              <option value="0.5">transonic · peak 0.50</option>
+              <option value="0.6667" selected>supersonic · peak 0.67</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Stability <i>longitudinal</i></h3>
+        <div class="body">
+          <div class="rows" id="stabRows"></div>
+          <div style="margin-top:9px;display:flex;align-items:center;gap:8px">
+            <span class="note" style="flex:1">Static margin</span>
+            <span class="pill" id="smPill">—</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Method &amp; Limits</h3>
+        <div class="body">
+          <div class="note" id="methodNote"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Drag vs Mach <i>zero-lift buildup</i></h3>
+        <div class="body">
+          <canvas class="chart" id="dragsweep" height="170"></canvas>
+          <div class="legend">
+            <span><i style="background:#ff9d3c"></i>total</span>
+            <span><i style="background:#6f8aa3"></i>CD0</span>
+            <span><i style="background:#ff5d6c"></i>wave</span>
+            <span><i style="background:#9fb4c8"></i>base</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Flight Envelope <i>sustainable level flight</i></h3>
+        <div class="body">
+          <canvas class="chart" id="envelope" height="210"></canvas>
+          <div class="legend">
+            <span><i style="background:#2e7d54"></i>can sustain</span>
+            <span><i style="background:#7a4030"></i>thrust-limited</span>
+            <span><i style="background:#3a4a5e"></i>lift-limited</span>
+            <span><i style="background:#ffd166"></i>now</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Reference Compare <i>L/D vs T/W</i></h3>
+        <div class="body">
+          <canvas class="chart" id="refchart" height="190"></canvas>
+          <div class="note" id="refNote" style="margin-top:4px">Approx. published figures; your point uses current-Mach L/D max and static (sea-level) T/W, matching the reference convention.</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Radar Cross-Section <i>monostatic</i></h3>
+        <div class="body">
+          <div style="display:flex;gap:6px;margin-bottom:9px">
+            <button class="btn ghost rcsmode" data-m="proj" style="flex:1;font-size:10px;padding:5px 6px">Projected</button>
+            <button class="btn ghost rcsmode" data-m="sbr" style="flex:1;font-size:10px;padding:5px 6px">Ray-trace</button>
+          </div>
+          <button class="btn ghost" id="bEdge" style="width:100%;font-size:10px;padding:5px 6px;margin-bottom:9px">◇ Edge-alignment overlay</button>
+          <div class="ctrl" id="rcsProjCtrls" style="margin-bottom:9px">
+            <label>Shaping K <b id="vRcsK">−1.00</b> <span id="rcsKpct" style="color:var(--ink-faint);font-size:9px">×10%</span></label>
+            <input id="sRcsK" type="range" min="-5" max="0.3" step="0.05" value="-1">
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+              <button class="btn ghost rcsp" data-k="-0.1" style="font-size:9px;padding:3px 7px">Flat plate</button>
+              <button class="btn ghost rcsp" data-k="-0.7" style="font-size:9px;padding:3px 7px">Conventional</button>
+              <button class="btn ghost rcsp" data-k="-1" style="font-size:9px;padding:3px 7px">LO shaped</button>
+              <button class="btn ghost rcsp" data-k="-2" style="font-size:9px;padding:3px 7px">VLO (F-22)</button>
+              <button class="btn ghost rcsp" data-k="-3" style="font-size:9px;padding:3px 7px">B-2 class</button>
+              <button class="btn ghost rcsp" data-k="-5" style="font-size:9px;padding:3px 7px">Max stealth</button>
+            </div>
+          </div>
+          <div id="sbrCtrls" style="display:none;margin-bottom:9px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px">
+              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">BAND <select id="sbrBand" style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option value="1.5">VHF</option><option value="0.23">L</option><option value="0.1">S</option><option value="0.05">C</option><option value="0.03" selected>X</option><option value="0.02">Ku</option></select></label>
+              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">BOUNCES <select id="sbrBounce" style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option>1</option><option selected>2</option><option>3</option></select></label>
+              <label style="font-size:9px;letter-spacing:1px;color:var(--ink-dim)">RAYS <select id="sbrDens" style="background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:4px;font-size:10px;padding:2px 4px;font-family:var(--mono)"><option value="24">Coarse</option><option value="36" selected>Medium</option><option value="52">Fine</option></select></label>
+            </div>
+            <div class="ctrl" style="margin-bottom:7px"><label>Reflectivity <b id="vSbrR">1.00</b></label><input id="sbrRefl" type="range" min="0.1" max="1" step="0.05" value="1"></div>
+            <button class="btn" id="bSbr" style="font-size:10px;padding:6px 10px;width:100%">Compute ray-trace RCS</button>
+          </div>
+          <canvas class="chart" id="rcsPolar" height="240"></canvas>
+          <div class="legend">
+            <span><i style="background:#ff9d3c"></i>0° el</span>
+            <span><i style="background:#ffd166"></i>+5° el</span>
+            <span><i style="background:#6f8aa3"></i>−5° el</span>
+            <span><i style="background:#c77dff"></i>edges</span>
+          </div>
+          <div class="rows" id="rcsRows" style="margin-top:6px"></div>
+          <div id="rcsEdgeNote" style="display:none;font-size:9px;color:#c77dff;letter-spacing:.3px;margin-top:5px"></div>
+          <div class="note" id="rcsNote" style="margin-top:6px">Projected silhouette Σ(n·r̂)·A scaled by 10^K (model assumed in metres). First-order proxy — captures planform exposure, not specular spikes, edge diffraction, frequency, or RAM. K presets stand in for those heuristically.</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Design State</h3>
+        <div class="body">
+          <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+            <input id="stateLabel" type="text" placeholder="label" style="flex:1;min-width:90px;font-family:var(--mono);background:#0c1622;color:var(--ink);border:1px solid var(--edge2);border-radius:5px;padding:5px 7px;font-size:11px">
+            <button class="btn ghost" id="bSaveState" style="font-size:10px;padding:5px 10px">Save</button>
+            <button class="btn ghost" id="bLoadState" style="font-size:10px;padding:5px 10px">Load</button>
+          </div>
+          <div class="note" style="margin-top:6px">Saves condition &amp; engine settings (not the STL). Reload the model separately.</div>
+          <input id="stateFile" type="file" accept=".json" hidden>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+"use strict";
+/* ============================== validated physics core ============================== */
+function isa(h){
+  const g=9.80665,R=287.053,T0=288.15,p0=101325;let T,p;
+  if(h<=11000){const L=-0.0065;T=T0+L*h;p=p0*Math.pow(T/T0,-g/(L*R));}
+  else{const T11=T0-0.0065*11000,p11=p0*Math.pow(T11/T0,-g/(-0.0065*R));T=T11;p=p11*Math.exp(-g*(h-11000)/(R*T11));}
+  const rho=p/(R*T),a=Math.sqrt(1.4*R*T);
+  const mu=1.716e-5*Math.pow(T/273.15,1.5)*(383.55)/(T+110.4);
+  return{T,p,rho,a,mu};
+}
+function cfTurb(Re,M){Re=Math.max(Re,1e5);return (0.455/Math.pow(Math.log10(Re),2.58))/Math.pow(1+0.144*M*M,0.65);}
+function waveDragSB(Sx,L,nModes=50,M=500){
+  const n=Sx.length,hx=L/(n-1);
+  const interp=x=>{if(x<=0||x>=L)return 0;const f=x/hx,i=Math.floor(f),w=f-i;return i>=n-1?Sx[n-1]:Sx[i]*(1-w)+Sx[i+1]*w;};
+  const t=new Array(M),S=new Array(M);
+  for(let k=0;k<M;k++){t[k]=Math.PI*(k+0.5)/M;S[k]=interp(L/2*(1-Math.cos(t[k])));}
+  const dtt=Math.PI/M,dSdx=new Array(M);
+  for(let k=0;k<M;k++){const km=Math.max(0,k-1),kp=Math.min(M-1,k+1);
+    const dSdt=(S[kp]-S[km])/((kp-km)*dtt);dSdx[k]=(2/(L*Math.sin(t[k])))*dSdt;}
+  let Dq=0;
+  for(let m=1;m<=nModes;m++){let a=0;for(let k=0;k<M;k++)a+=dSdx[k]*Math.sin(m*t[k]);a*=(2/Math.PI)*dtt;Dq+=m*a*a;}
+  return Math.max(Dq*Math.PI/4,0);
+}
+const waveDragSH=(V,L)=>128*V*V/(Math.PI*Math.pow(L,4));
+// faired wave drag: light smooth + close nose + smooth afterbody from Abase->0; low-mode (noise-robust)
+function smoothArea(S){const a=S.slice();const b=a.slice();for(let i=1;i<a.length-1;i++)b[i]=0.25*a[i-1]+0.5*a[i]+0.25*a[i+1];return b;}
+function waveDragFaired(S,L,Abase){
+  const n=S.length,dls=L/(n-1);let ext=smoothArea(S);ext=ext.slice();ext[0]=0;
+  if(Abase>1e-9){const dia=Math.sqrt(4*Abase/Math.PI),Lc=2.2*dia,nAdd=Math.max(4,Math.round(Lc/dls));
+    for(let i=1;i<=nAdd;i++){const f=i/nAdd;ext.push(Abase*Math.pow(1-f,1.5));}
+  } else { ext[ext.length-1]=0; }
+  return waveDragSB(ext,(ext.length-1)*dls,18);   // 18 modes: keep area-rule content, drop rasterization noise
+}
+const smooth=(x,a,b)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+
+/* ============================== STL parsing ============================== */
+function parseSTL(buf){
+  const dv=new DataView(buf);
+  // detect ascii
+  let ascii=false;
+  const head=new TextDecoder().decode(new Uint8Array(buf,0,Math.min(512,buf.byteLength))).trim();
+  if(head.startsWith("solid")){
+    if(buf.byteLength>=84){const n=dv.getUint32(80,true);if(84+n*50!==buf.byteLength)ascii=true;}
+    else ascii=true;
+  }
+  const tris=[];
+  if(ascii){
+    const txt=new TextDecoder().decode(new Uint8Array(buf));
+    const re=/vertex\s+(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)/g;let m,vs=[];
+    while((m=re.exec(txt))){vs.push([+m[1],+m[2],+m[3]]);if(vs.length===3){tris.push(vs);vs=[];}}
+  }else{
+    const n=dv.getUint32(80,true);let o=84;
+    for(let i=0;i<n;i++){o+=12;const v=[];for(let j=0;j<3;j++){v.push([dv.getFloat32(o,true),dv.getFloat32(o+4,true),dv.getFloat32(o+8,true)]);o+=12;}o+=2;tris.push(v);}
+  }
+  return tris;
+}
+
+/* ============================== thickness & camber (validated) ============================== */
+function analyzeThickness(T, Llen, Sext, Vext, span){
+  const half=span/2, fracs=[0.20,0.30,0.40,0.50,0.60,0.70,0.80];
+  const gL=240,gV=120,padL=Llen*0.04,padV=Vext*0.08,Lspan=Llen+2*padL,Vspan=Vext+2*padV;
+  const dl=Lspan/gL,dv=Vspan/gV,vOff=Vext/2+padV,results=[];
+  for(const fr of fracs){
+    const s0=fr*half,grid=new Uint8Array(gL*gV);let any=false;
+    const drawSeg=(x0,y0,x1,y1)=>{x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);
+      let dx=Math.abs(x1-x0),dy=Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx-dy;
+      for(;;){if(x0>=0&&x0<gL&&y0>=0&&y0<gV){grid[y0*gL+x0]=1;any=true;}if(x0===x1&&y0===y1)break;const e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}};
+    for(const tri of T){const pts=[];
+      for(let e=0;e<3;e++){const A=tri[e],B=tri[(e+1)%3];const da=A[1]-s0,db=B[1]-s0;
+        if((da<=0&&db>0)||(da>0&&db<=0)){const t=da/(da-db);pts.push([A[0]+t*(B[0]-A[0]),A[2]+t*(B[2]-A[2])]);}}
+      if(pts.length>=2)drawSeg((pts[0][0]+padL)/dl,(pts[0][1]+vOff)/dv,(pts[1][0]+padL)/dl,(pts[1][1]+vOff)/dv);}
+    if(!any)continue;
+    const tmp=new Uint8Array(gL*gV);
+    for(let y=0;y<gV;y++)for(let x=0;x<gL;x++)if(grid[y*gL+x]){for(let a=-1;a<=1;a++)for(let bq=-1;bq<=1;bq++){const nx=x+bq,ny=y+a;if(nx>=0&&nx<gL&&ny>=0&&ny<gV)tmp[ny*gL+nx]=1;}}
+    const vis=new Uint8Array(gL*gV),stk=new Int32Array(gL*gV);let sp=0;
+    const push=(x,y)=>{const id=y*gL+x;if(!tmp[id]&&!vis[id]){vis[id]=1;stk[sp++]=id;}};
+    for(let x=0;x<gL;x++){push(x,0);push(x,gV-1);}for(let y=0;y<gV;y++){push(0,y);push(gL-1,y);}
+    while(sp>0){const id=stk[--sp],x=id%gL,y=(id/gL)|0;if(x>0)push(x-1,y);if(x<gL-1)push(x+1,y);if(y>0)push(x,y-1);if(y<gV-1)push(x,y+1);}
+    let lMin=gL,lMax=-1;const vlo=new Int16Array(gL).fill(-1),vhi=new Int16Array(gL).fill(-1);
+    for(let x=0;x<gL;x++){let lo=-1,hi=-1;for(let y=0;y<gV;y++){if(!vis[y*gL+x]){if(lo<0)lo=y;hi=y;}}
+      if(lo>=0){vlo[x]=lo;vhi[x]=hi;if(x<lMin)lMin=x;if(x>lMax)lMax=x;}}
+    if(lMax<lMin)continue;const chord=(lMax-lMin+1)*dl;if(chord<0.04*Llen)continue;
+    let tmax=0;const mids=[];
+    for(let x=lMin;x<=lMax;x++){if(vlo[x]<0)continue;const tt=(vhi[x]-vlo[x])*dv;if(tt>tmax)tmax=tt;mids.push({l:x*dl,m:((vlo[x]+vhi[x])/2)*dv-vOff});}
+    if(mids.length<4)continue;
+    const midLE=mids[0].m,midTE=mids[mids.length-1].m,lLE=mids[0].l,lTE=mids[mids.length-1].l;
+    let cambMax=0;for(const p of mids){const f=(p.l-lLE)/Math.max(lTE-lLE,1e-9);const dev=p.m-(midLE+f*(midTE-midLE));if(Math.abs(dev)>Math.abs(cambMax))cambMax=dev;}
+    const tc=tmax/chord,camber=cambMax/chord;
+    if(tc>0.001&&tc<0.40)results.push({tc,camber});
+  }
+  if(results.length===0)return{tc:0,camber:0,valid:false,nStations:0};
+  const med=arr=>{const a=arr.slice().sort((x,y)=>x-y),n=a.length;return n%2?a[(n-1)/2]:0.5*(a[n/2-1]+a[n/2]);};
+  return{tc:med(results.map(r=>r.tc)),camber:med(results.map(r=>r.camber)),valid:true,nStations:results.length};
+}
+
+/* ============================== voxel remesh (validated) ============================== */
+const VC=[[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+const VE=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+function vDilate(g,dims,r){const[nx,ny,nz]=dims;let cur=g;for(let it=0;it<r;it++){const out=new Uint8Array(cur.length);
+  for(let z=0;z<nz;z++)for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){const id=x+nx*y+nx*ny*z;if(cur[id]){out[id]=1;continue;}
+    let m=0;if(x>0&&cur[id-1])m=1;else if(x<nx-1&&cur[id+1])m=1;else if(y>0&&cur[id-nx])m=1;else if(y<ny-1&&cur[id+nx])m=1;else if(z>0&&cur[id-nx*ny])m=1;else if(z<nz-1&&cur[id+nx*ny])m=1;out[id]=m;}cur=out;}return cur;}
+function vErode(g,dims,r){const[nx,ny,nz]=dims;let cur=g;for(let it=0;it<r;it++){const out=new Uint8Array(cur.length);
+  for(let z=0;z<nz;z++)for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){const id=x+nx*y+nx*ny*z;if(!cur[id]){out[id]=0;continue;}
+    let k=1;if(x===0||!cur[id-1])k=0;else if(x===nx-1||!cur[id+1])k=0;else if(y===0||!cur[id-nx])k=0;else if(y===ny-1||!cur[id+nx])k=0;else if(z===0||!cur[id-nx*ny])k=0;else if(z===nz-1||!cur[id+nx*ny])k=0;out[id]=k;}cur=out;}return cur;}
+function voxelizeSolid(tris,res,closeR){
+  const lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30];
+  for(const t of tris)for(const v of t)for(let d=0;d<3;d++){if(v[d]<lo[d])lo[d]=v[d];if(v[d]>hi[d])hi[d]=v[d];}
+  const ext=[hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]],maxE=Math.max(...ext),h=maxE/res,pad=closeR+2;
+  const dims=[Math.ceil(ext[0]/h)+2*pad,Math.ceil(ext[1]/h)+2*pad,Math.ceil(ext[2]/h)+2*pad];
+  const origin=[lo[0]-pad*h,lo[1]-pad*h,lo[2]-pad*h],[nx,ny,nz]=dims,NX=nx,NXY=nx*ny,idx=(x,y,z)=>x+NX*y+NXY*z;
+  const shell=new Uint8Array(nx*ny*nz);
+  for(const[A,B,C] of tris){const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2],wx=C[0]-A[0],wy=C[1]-A[1],wz=C[2]-A[2];
+    const area=0.5*Math.hypot(uy*wz-uz*wy,uz*wx-ux*wz,ux*wy-uy*wx),n=Math.max(1,Math.ceil(2*Math.sqrt(area)/h));
+    for(let i=0;i<=n;i++)for(let j=0;j<=n-i;j++){const a=i/n,b=j/n;
+      const x=Math.floor((A[0]+a*ux+b*wx-origin[0])/h),y=Math.floor((A[1]+a*uy+b*wy-origin[1])/h),z=Math.floor((A[2]+a*uz+b*wz-origin[2])/h);
+      if(x>=0&&x<nx&&y>=0&&y<ny&&z>=0&&z<nz)shell[idx(x,y,z)]=1;}}
+  let dil=closeR>0?vDilate(shell,dims,closeR):shell;
+  const outside=new Uint8Array(nx*ny*nz),stack=[];
+  const pushIf=(x,y,z)=>{const id=idx(x,y,z);if(!dil[id]&&!outside[id]){outside[id]=1;stack.push(id);}};
+  for(let x=0;x<nx;x++)for(let y=0;y<ny;y++){pushIf(x,y,0);pushIf(x,y,nz-1);}
+  for(let x=0;x<nx;x++)for(let z=0;z<nz;z++){pushIf(x,0,z);pushIf(x,ny-1,z);}
+  for(let y=0;y<ny;y++)for(let z=0;z<nz;z++){pushIf(0,y,z);pushIf(nx-1,y,z);}
+  while(stack.length){const id=stack.pop(),x=id%NX,y=((id/NX)|0)%ny,z=(id/NXY)|0;
+    if(x>0)pushIf(x-1,y,z);if(x<nx-1)pushIf(x+1,y,z);if(y>0)pushIf(x,y-1,z);if(y<ny-1)pushIf(x,y+1,z);if(z>0)pushIf(x,y,z-1);if(z<nz-1)pushIf(x,y,z+1);}
+  let solid=new Uint8Array(nx*ny*nz);for(let i=0;i<solid.length;i++)solid[i]=outside[i]?0:1;
+  if(closeR>0)solid=vErode(solid,dims,closeR);
+  return{occ:solid,dims,origin,h};
+}
+function surfaceNets(occ,dims,origin,h){
+  const[nx,ny,nz]=dims,NX=nx,NXY=nx*ny,at=(x,y,z)=>occ[x+NX*y+NXY*z];
+  const cellVert=new Int32Array(nx*ny*nz).fill(-1),cidx=(x,y,z)=>x+nx*y+nx*ny*z,verts=[];
+  for(let z=0;z<nz-1;z++)for(let y=0;y<ny-1;y++)for(let x=0;x<nx-1;x++){
+    let mask=0,s=[];for(let i=0;i<8;i++){const c=VC[i],v=at(x+c[0],y+c[1],z+c[2]);s.push(v);if(v)mask|=(1<<i);}
+    if(mask===0||mask===255)continue;let ax=0,ay=0,az=0,cnt=0;
+    for(const[a,b] of VE){if(s[a]!==s[b]){const ca=VC[a],cb=VC[b];ax+=(ca[0]+cb[0])/2;ay+=(ca[1]+cb[1])/2;az+=(ca[2]+cb[2])/2;cnt++;}}
+    ax/=cnt;ay/=cnt;az/=cnt;cellVert[cidx(x,y,z)]=verts.length;verts.push([origin[0]+(x+ax)*h,origin[1]+(y+ay)*h,origin[2]+(z+az)*h]);}
+  const tris=[],quad=(a,b,c,d,flip)=>{if(a<0||b<0||c<0||d<0)return;
+    if(!flip){tris.push([verts[a],verts[b],verts[c]]);tris.push([verts[a],verts[c],verts[d]]);}
+    else{tris.push([verts[a],verts[c],verts[b]]);tris.push([verts[a],verts[d],verts[c]]);}};
+  for(let z=0;z<nz-1;z++)for(let y=0;y<ny-1;y++)for(let x=0;x<nx-1;x++){const s0=at(x,y,z);
+    if(x>0&&y>0&&z>0){
+      if(s0!==at(x+1,y,z))quad(cellVert[cidx(x,y-1,z-1)],cellVert[cidx(x,y,z-1)],cellVert[cidx(x,y,z)],cellVert[cidx(x,y-1,z)],s0===0);
+      if(s0!==at(x,y+1,z))quad(cellVert[cidx(x-1,y,z-1)],cellVert[cidx(x,y,z-1)],cellVert[cidx(x,y,z)],cellVert[cidx(x-1,y,z)],s0!==0);
+      if(s0!==at(x,y,z+1))quad(cellVert[cidx(x-1,y-1,z)],cellVert[cidx(x,y-1,z)],cellVert[cidx(x,y,z)],cellVert[cidx(x-1,y,z)],s0===0);}}
+  return{verts,tris};
+}
+function laplacianSmooth(meshTris,iters){
+  const map=new Map(),verts=[],adj=[],key=p=>p[0].toFixed(4)+','+p[1].toFixed(4)+','+p[2].toFixed(4),triIdx=[];
+  for(const t of meshTris){const ids=[];for(const p of t){const k=key(p);let i=map.get(k);if(i===undefined){i=verts.length;map.set(k,i);verts.push([p[0],p[1],p[2]]);adj.push(new Set());}ids.push(i);}triIdx.push(ids);
+    for(let e=0;e<3;e++){adj[ids[e]].add(ids[(e+1)%3]);adj[ids[(e+1)%3]].add(ids[e]);}}
+  for(let it=0;it<iters;it++){const nv=verts.map((v,i)=>{const a=adj[i];if(!a.size)return v;let x=0,y=0,z=0;a.forEach(j=>{x+=verts[j][0];y+=verts[j][1];z+=verts[j][2];});const n=a.size;return[0.5*v[0]+0.5*x/n,0.5*v[1]+0.5*y/n,0.5*v[2]+0.5*z/n];});for(let i=0;i<verts.length;i++)verts[i]=nv[i];}
+  return triIdx.map(ids=>ids.map(i=>verts[i]));
+}
+function remeshTris(tris,res){const r=voxelizeSolid(tris,res,2);const sn=surfaceNets(r.occ,r.dims,r.origin,r.h);return laplacianSmooth(sn.tris,2);}
+
+/* ============================== geometry analysis ============================== */
+function analyzeGeometry(tris,axisChoice,noseChoice){
+  // bbox
+  const lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30];
+  for(const t of tris)for(const v of t)for(let d=0;d<3;d++){if(v[d]<lo[d])lo[d]=v[d];if(v[d]>hi[d])hi[d]=v[d];}
+  const ext=[hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2]];
+  // choose longitudinal axis
+  let L= axisChoice==='auto' ? ext.indexOf(Math.max(...ext)) : {X:0,Y:1,Z:2}[axisChoice];
+  const rest=[0,1,2].filter(d=>d!==L);
+  const Sp = ext[rest[0]]>=ext[rest[1]]?rest[0]:rest[1]; // span = wider of remaining
+  const Vt = rest[0]===Sp?rest[1]:rest[0];               // vertical
+  const flip = noseChoice==='max'; // if nose at +end, mirror longitudinal so nose at 0
+  // remap each vertex to (l,s,v) with l in [0,Llen], nose at l=0
+  const Llen=ext[L], Sext=ext[Sp], Vext=ext[Vt];
+  const map=v=>{
+    let l=v[L]-lo[L]; if(flip) l=Llen-l;
+    return [l, v[Sp]-lo[Sp]-Sext/2, v[Vt]-lo[Vt]-Vext/2];
+  };
+  const T=tris.map(t=>t.map(map));
+  // wetted area + volume
+  let Swet=0,Vol=0;
+  for(const[a,b,c] of T){
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2], wx=c[0]-a[0],wy=c[1]-a[1],wz=c[2]-a[2];
+    const cx=uy*wz-uz*wy,cy=uz*wx-ux*wz,cz=ux*wy-uy*wx;
+    Swet+=0.5*Math.hypot(cx,cy,cz);
+    Vol+=(a[0]*(b[1]*c[2]-b[2]*c[1])+a[1]*(b[2]*c[0]-b[0]*c[2])+a[2]*(b[0]*c[1]-b[1]*c[0]))/6;
+  }
+  const normSign = Vol>=0 ? 1 : -1;   // remapped winding; <0 => cross-product normals point inward
+  Vol=Math.abs(Vol);
+
+  // ---- planform silhouette (l-s plane): rasterize filled triangles ----
+  const GL=Math.min(420,Math.max(140,Math.round(Llen/Sext*180)))||220, GS=200;
+  const dl=Llen/GL, ds=Sext/GS;
+  const plan=new Uint8Array(GL*GS);
+  const rasterTri=(p0,p1,p2)=>{ // in (col=l, row=s) index space
+    const xs=[p0[0],p1[0],p2[0]],ys=[p0[1],p1[1],p2[1]];
+    let cmin=Math.max(0,Math.floor(Math.min(...xs))),cmax=Math.min(GL-1,Math.ceil(Math.max(...xs)));
+    let rmin=Math.max(0,Math.floor(Math.min(...ys))),rmax=Math.min(GS-1,Math.ceil(Math.max(...ys)));
+    const d=(ax,ay,bx,by,px,py)=>(px-ax)*(by-ay)-(py-ay)*(bx-ax);
+    const area=d(p0[0],p0[1],p1[0],p1[1],p2[0],p2[1]); if(Math.abs(area)<1e-9)return;
+    for(let r=rmin;r<=rmax;r++)for(let c=cmin;c<=cmax;c++){
+      const px=c+0.5,py=r+0.5;
+      let w0=d(p1[0],p1[1],p2[0],p2[1],px,py),w1=d(p2[0],p2[1],p0[0],p0[1],px,py),w2=d(p0[0],p0[1],p1[0],p1[1],px,py);
+      if((w0>=0&&w1>=0&&w2>=0)||(w0<=0&&w1<=0&&w2<=0))plan[r*GL+c]=1;
+    }
+  };
+  for(const tri of T){
+    const pp=tri.map(v=>[(v[0])/dl, (v[1]+Sext/2)/ds]);
+    rasterTri(pp[0],pp[1],pp[2]);
+  }
+  // planform area, chord c(s), leading edge LE(s)
+  let Splan=0; const chord=new Float64Array(GS),le=new Float64Array(GS);
+  for(let r=0;r<GS;r++){let cmin=-1,cmax=-1;for(let c=0;c<GL;c++)if(plan[r*GL+c]){if(cmin<0)cmin=c;cmax=c;Splan++;}
+    if(cmin>=0){chord[r]=(cmax-cmin+1)*dl; le[r]=cmin*dl;}else{chord[r]=0;le[r]=NaN;}}
+  Splan*=dl*ds;
+  // span (rows with chord>0)
+  let r0=-1,r1=-1;for(let r=0;r<GS;r++)if(chord[r]>0){if(r0<0)r0=r;r1=r;}
+  const span=(r1-r0+1)*ds;
+  // MAC and aero center x
+  let sumC=0,sumC2=0,sumLEc=0,sumSc=0;
+  for(let r=r0;r<=r1;r++){const c=chord[r];if(c>0){sumC+=c*ds;sumC2+=c*c*ds;sumLEc+=le[r]*c*ds;sumSc+=(r+0.5)*ds*c*ds;}}
+  const MAC=sumC>0?sumC2/sumC:Llen, xLE_MAC=sumC>0?sumLEc/sumC:0;
+  const AR=Splan>0?span*span/Splan:0.1;
+  // LE sweep: linear fit of le(s) over half span (root->tip), root at side of max chord
+  let rRoot=r0;{let mx=0;for(let r=r0;r<=r1;r++)if(chord[r]>mx){mx=chord[r];rRoot=r;}}
+  let n=0,Ss=0,Sx=0,Sss=0,Ssx=0;
+  for(let r=rRoot;r<=r1;r++){if(chord[r]>0&&isFinite(le[r])){const sx=(r-rRoot)*ds,lx=le[r];n++;Ss+=sx;Sx+=lx;Sss+=sx*sx;Ssx+=sx*lx;}}
+  let sweepLE=0;if(n>2){const den=n*Sss-Ss*Ss;if(Math.abs(den)>1e-9){const slope=(n*Ssx-Ss*Sx)/den;sweepLE=Math.atan(slope)*180/Math.PI;}}
+
+  // ---- cross-sectional area S(l): per-slice silhouette + flood fill ----
+  const NS=160, gs=90, gv=90;
+  const dls=Llen/NS, cellA=(Sext/gs)*(Vext/gv);
+  const slices=Array.from({length:NS},()=>new Uint8Array(gs*gv));
+  const drawSeg=(grid,x0,y0,x1,y1)=>{ // bresenham in (col=s,row=v)
+    x0=Math.round(x0);y0=Math.round(y0);x1=Math.round(x1);y1=Math.round(y1);
+    let dx=Math.abs(x1-x0),dy=Math.abs(y1-y0),sx=x0<x1?1:-1,sy=y0<y1?1:-1,err=dx-dy;
+    for(;;){if(x0>=0&&x0<gs&&y0>=0&&y0<gv)grid[y0*gs+x0]=1;if(x0===x1&&y0===y1)break;const e2=2*err;if(e2>-dy){err-=dy;x0+=sx;}if(e2<dx){err+=dx;y0+=sy;}}
+  };
+  for(const tri of T){
+    const ls=tri.map(v=>v[0]);
+    const lmin=Math.min(...ls),lmax=Math.max(...ls);
+    let i0=Math.max(0,Math.floor(lmin/dls)),i1=Math.min(NS-1,Math.ceil(lmax/dls));
+    for(let i=i0;i<=i1;i++){
+      const Lp=(i+0.5)*dls; const pts=[];
+      for(let e=0;e<3;e++){const A=tri[e],B=tri[(e+1)%3];const da=A[0]-Lp,db=B[0]-Lp;
+        if((da<=0&&db>0)||(da>0&&db<=0)){const t=da/(da-db);pts.push([A[1]+t*(B[1]-A[1]),A[2]+t*(B[2]-A[2])]);}}
+      if(pts.length>=2){const g=slices[i];
+        const s0=(pts[0][0]+Sext/2)/(Sext/gs), v0=(pts[0][1]+Vext/2)/(Vext/gv);
+        const s1=(pts[1][0]+Sext/2)/(Sext/gs), v1=(pts[1][1]+Vext/2)/(Vext/gv);
+        drawSeg(g,s0,v0,s1,v1);}
+    }
+  }
+  const Sx_arr=new Float64Array(NS), xArr=new Float64Array(NS);
+  const tmp=new Uint8Array(gs*gv), vis=new Uint8Array(gs*gv), stack=new Int32Array(gs*gv);
+  for(let i=0;i<NS;i++){
+    xArr[i]=(i+0.5)*dls; const g=slices[i];
+    // dilate 1px into tmp
+    tmp.fill(0);
+    for(let y=0;y<gv;y++)for(let x=0;x<gs;x++)if(g[y*gs+x]){for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx>=0&&nx<gs&&ny>=0&&ny<gv)tmp[ny*gs+nx]=1;}}
+    // flood from border over non-shell -> outside
+    vis.fill(0);let sp=0;
+    const push=(x,y)=>{const id=y*gs+x;if(!tmp[id]&&!vis[id]){vis[id]=1;stack[sp++]=id;}};
+    for(let x=0;x<gs;x++){push(x,0);push(x,gv-1);}for(let y=0;y<gv;y++){push(0,y);push(gs-1,y);}
+    while(sp>0){const id=stack[--sp],x=id%gs,y=(id/gs)|0;
+      if(x>0)push(x-1,y);if(x<gs-1)push(x+1,y);if(y>0)push(x,y-1);if(y<gv-1)push(x,y+1);}
+    let inside=0;for(let id=0;id<gs*gv;id++)if(!vis[id])inside++; // shell+enclosed
+    Sx_arr[i]=inside*cellA;
+  }
+  // dip-fix: interpolate short drops (<=4 wide) >=40% below both shoulders
+  const S=Array.from(Sx_arr);
+  for(let i=1;i<NS-1;i++){
+    for(let w=1;w<=4;w++){const a=i-1,b=i+w;if(b>=NS)break;
+      const shL=S[a],shR=S[b];if(shL<=0||shR<=0)continue;let dip=true;
+      for(let k=i;k<b;k++)if(S[k]>=0.6*Math.min(shL,shR)){dip=false;break;}
+      if(dip){for(let k=i;k<b;k++){const f=(k-a)/(b-a);S[k]=shL+f*(shR-shL);}i=b;break;}
+    }
+  }
+  // nose assumed pointy; capture real base area at the tail (median of last few stations)
+  S[0]=0;
+  const tailVals=[]; for(let i=2;i<=Math.max(3,Math.round(NS*0.05));i++)tailVals.push(S[NS-1-i]);
+  tailVals.sort((a,b)=>a-b); const Abase=Math.max(0,tailVals[(tailVals.length-1)>>1]||0);
+  S[NS-1]=Abase;
+  const Amax=Math.max(...S);
+  const Vfromslices=S.reduce((s,v,i)=>i?s+0.5*(v+S[i-1])*dls:0,0);
+
+  const thick=analyzeThickness(T,Llen,Sext,Vext,span);
+
+  return {
+    tris:T, lo,hi,ext, Laxis:L,Saxis:Sp,Vaxis:Vt, flip,
+    Llen,Sext,Vext, Swet,Vol, Splan,MAC,xLE_MAC,AR,span,sweepLE,
+    Sx:S,xArr:Array.from(xArr),Amax,Vslices:Vfromslices, nTri:T.length,
+    deq:Math.sqrt(4*Amax/Math.PI), Abase, normSign,
+    tc:thick.tc, camber:thick.camber, tcValid:thick.valid, tcStations:thick.nStations
+  };
+}
+
+/* ============================== aerodynamic model ============================== */
+// installed thrust lapse from sea-level static rating, vs Mach / true airspeed & density (rough averages)
+function thrustLapse(Tstatic,M,V,rho,type){
+  const sigma=Math.max(rho/1.225,1e-4);
+  if(type==='prop'){                                // propeller: ~constant power -> thrust falls as 1/V
+    const Vc=35;                                     // corner speed (m/s): static-limited below, power-limited above
+    return Tstatic*Math.pow(sigma,0.8)*(Vc/Math.max(V,Vc));
+  }
+  if(type==='high'){                                // high-bypass turbofan: steep loss with speed
+    return Tstatic*Math.pow(sigma,0.85)*Math.max(0.30,1-0.49*Math.sqrt(Math.max(M,0)));
+  }
+  const mf = M<0.9 ? (1-0.11*M) : Math.min(1.45,0.901+0.16*(M-0.9));  // turbojet/low-bypass: ram recovery
+  return Tstatic*Math.pow(sigma,0.62)*mf;
+}
+/* ---- in-browser exact-section supersonic (Jones) wave drag (replaces offline CLI) ---- */
+function wdShear(tris,beta,theta){const c=Math.cos(theta),sn=Math.sin(theta);
+  return tris.map(t=>t.map(v=>[v[0]-(v[1]*c+v[2]*sn)*beta, v[1], v[2]]));}
+function wdAreaDist(TT,flip,NS){
+  let lmin=1e30,lmax=-1e30;for(const t of TT)for(const v of t){if(v[0]<lmin)lmin=v[0];if(v[0]>lmax)lmax=v[0];}
+  const Lp=(lmax-lmin)||1e-6,dls=Lp/NS,S=new Float64Array(NS),resid=new Float64Array(NS),peri=new Float64Array(NS);
+  for(const t of TT){
+    const ux=t[1][0]-t[0][0],uy=t[1][1]-t[0][1],uz=t[1][2]-t[0][2],wx=t[2][0]-t[0][0],wy=t[2][1]-t[0][1],wz=t[2][2]-t[0][2];
+    const npl0=flip*(uz*wx-ux*wz), npl1=flip*(ux*wy-uy*wx);   // (s,v) components of tri normal
+    const lo=Math.min(t[0][0],t[1][0],t[2][0])-lmin,hi=Math.max(t[0][0],t[1][0],t[2][0])-lmin;
+    let i0=Math.max(0,Math.floor(lo/dls)),i1=Math.min(NS-1,Math.ceil(hi/dls));
+    for(let i=i0;i<=i1;i++){const cut=(i+0.5)*dls+lmin;const pp=[];
+      for(let e=0;e<3;e++){const A=t[e],B=t[(e+1)%3],da=A[0]-cut,db=B[0]-cut;
+        if((da<=0&&db>0)||(da>0&&db<=0)){const u=da/(da-db);pp.push([A[1]+u*(B[1]-A[1]),A[2]+u*(B[2]-A[2])]);}}
+      if(pp.length===2){let P=pp[0],Q=pp[1];const dx=Q[0]-P[0],dy=Q[1]-P[1];
+        if(dy*npl0+(-dx)*npl1<0){const tm=P;P=Q;Q=tm;}        // orient CCW (outward normal to the right)
+        S[i]+=0.5*(P[0]*Q[1]-Q[0]*P[1]);resid[i]+=(Q[0]-P[0]);peri[i]+=Math.hypot(dx,dy);}}
+  }
+  let bad=0,tot=0;for(let i=2;i<NS-2;i++){if(peri[i]>1e-9){tot++;if(Math.abs(resid[i])/peri[i]>0.03)bad++;}}
+  return {S:Array.from(S,v=>Math.abs(v)),L:Lp,badFrac:tot?bad/tot:1};
+}
+function wdJonesDq(tris,flip,M,nRoll,NS){const beta=Math.sqrt(Math.max(M*M-1,0));
+  if(beta===0){const d=wdAreaDist(wdShear(tris,0,0),flip,NS);return {dq:waveDragSB(d.S,d.L,40),bad:d.badFrac};}
+  let tot=0,bad=0;for(let a=0;a<nRoll;a++){const d=wdAreaDist(wdShear(tris,beta,Math.PI*a/nRoll),flip,NS);tot+=waveDragSB(d.S,d.L,40);if(d.badFrac>bad)bad=d.badFrac;}
+  return {dq:tot/nRoll,bad};}
+function computeJonesTable(){
+  if(!GEO)return null;const flip=GEO.normSign||1,NS=160,nRoll=12;
+  const j1=wdJonesDq(GEO.tris,flip,1.0,1,NS);if(!(j1.dq>0))return null;
+  const mach=[],shape=[];let worst=0;
+  for(let M=1.0;M<=3.5001;M+=0.1){const Mr=+M.toFixed(2);const j=wdJonesDq(GEO.tris,flip,Mr,nRoll,NS);
+    mach.push(Mr);shape.push(+(j.dq/j1.dq).toFixed(4));if(j.bad>worst)worst=j.bad;}
+  return {mach,shape,badFrac:worst};
+}
+let WDTABLE=null;   // loaded Jones DqW(M) shape table {mach:[],shape:[]} from jones_wavedrag.py
+function wdShapeAt(M){
+  if(!WDTABLE)return 1;
+  const ma=WDTABLE.mach, sh=WDTABLE.shape, n=ma.length;
+  if(M<=ma[0])return sh[0];
+  if(M>=ma[n-1])return sh[n-1];
+  let i=1;while(i<n&&ma[i]<M)i++;
+  const f=(M-ma[i-1])/(ma[i]-ma[i-1]);
+  return sh[i-1]+f*(sh[i]-sh[i-1]);
+}
+function aero(G,M,alt,cgFrac,aoaDeg,Tstatic,engType,wdScale,DqWpre){
+  wdScale = wdScale||1;
+  const atm=isa(alt), V=M*atm.a, q=0.5*atm.rho*V*V;
+  const Re=atm.rho*V*Math.max(G.MAC,1e-3)/atm.mu;
+  const Sref=Math.max(G.Splan,1e-6);
+  // zero-lift drag — blend body fineness form factor with a wing (t/c) form factor
+  const Cf=cfTurb(Re,M);
+  const f=clamp(G.Llen/Math.max(G.deq,1e-6),2,20);
+  const FFbody=1+60/(f*f*f)+f/400, Q=1.05;
+  const tc=G.tcValid?clamp(G.tc,0.01,0.30):0;
+  const swp=G.sweepLE*Math.PI/180;
+  const FFwing=tc>0?(1+2.7*tc+100*Math.pow(tc,4)):FFbody;
+  const wWing=clamp(G.AR/8,0,0.75);                          // how wing-like (by aspect ratio)
+  const FF=G.tcValid?(wWing*FFwing+(1-wWing)*FFbody):FFbody;
+  const CD0=Cf*FF*Q*G.Swet/Sref;
+  // camber-derived zero-lift angle & pitching moment (thin-airfoil)
+  const camb=G.tcValid?G.camber:0;
+  const aL0=-2*camb;                                         // rad (positive camber -> negative aL0)
+  const Cm0=-Math.PI*camb;                                  // section zero-lift Cm, estimate
+  // wave drag — onset at drag-divergence Mach (Korn), clamped to a sane band
+  const Mdd=tc>0?clamp(0.87/Math.max(Math.cos(swp),0.3)-tc/Math.pow(Math.max(Math.cos(swp),0.3),2),0.62,0.92):0.80;
+  const baseDqW=(DqWpre!=null)?DqWpre:waveDragFaired(G.Sx,G.Llen,G.Abase);   // faired afterbody, low-mode (no base cliff)
+  const DqW=baseDqW*wdShapeAt(M);   // Mach-dependent if a Jones DqW(M) table is loaded; else 1.0
+  const blend=smooth(M,Mdd,Mdd+0.25);
+  const CDw=DqW/Sref*blend*wdScale;
+  const CDwIdeal=waveDragSH(G.Vslices,G.Llen)/Sref*blend;
+  const arEff=CDw>1e-9?clamp(CDwIdeal/CDw,0,1):1;
+  // base drag: Cp_base ~ -0.13 subsonic -> -1/M^2 supersonic, smoothstep transition (no transonic kink)
+  const baseCoef = 0.13 + (1/(M*M) - 0.13)*smooth(M,0.85,1.08);
+  const CDbaseRaw = baseCoef*Math.max(G.Abase,0)/Sref;
+  // powered correction: exhaust jet fills the nozzle portion of the base, cutting base drag.
+  // fill grows with engine flow (∝ static thrust) vs the base-area dynamic force; capped (non-nozzle aft remains)
+  const Tdyn = (Tstatic>0) ? thrustLapse(Tstatic,M,V,atm.rho,engType) : 0;
+  const qAb = q*Math.max(G.Abase,0)/1000;                  // base dynamic force (kN)
+  const baseFill = (Tstatic>0&&qAb>0) ? Math.min(0.9, Tstatic/(Tstatic+0.5*qAb)) : 0;
+  const CDbase = CDbaseRaw*(1-baseFill);
+  // lift curve slope
+  const AR=G.AR;
+  let CLa; // per rad
+  const sub=()=>{const b2=Math.max(1-M*M,1e-3),beta=Math.sqrt(b2),eta=0.97;
+    return 2*Math.PI*AR/(2+Math.sqrt(4+Math.pow(AR*beta/eta,2)*(1+Math.pow(Math.tan(swp),2)/b2)));};
+  const sup=()=>{const b=Math.sqrt(Math.max(M*M-1,1e-3));return Math.min(4/b, 2*Math.PI);};
+  if(M<0.95)CLa=sub();
+  else if(M>1.05)CLa=sup();
+  else{const w=(M-0.95)/0.1;CLa=(1-w)*sub()+w*sup();}
+  // oswald + induced
+  let e=AR>2.5?1.78*(1-0.045*Math.pow(AR,0.68))-0.64:0.85;e=clamp(e,0.45,0.95);
+  if(M>1)e*=clamp(1-0.3*(M-1),0.55,1);
+  const k=1/(Math.PI*e*AR);
+  // polar sweep (lift offset by zero-lift angle from camber)
+  const pts=[]; let ld=0,clOpt=0,cdOpt=0,alOpt=0;
+  for(let aDeg=-6;aDeg<=18;aDeg+=0.5){
+    const CL=CLa*(aDeg*Math.PI/180 - aL0);
+    const CD=CD0+CDw+CDbase+k*CL*CL;
+    const r=CL/CD; if(r>ld){ld=r;clOpt=CL;cdOpt=CD;alOpt=aDeg;}
+    pts.push({a:aDeg,CL,CD});
+  }
+  // operating point
+  const aoa=aoaDeg;
+  const CLop=CLa*(aoa*Math.PI/180 - aL0), CDop=CD0+CDw+CDbase+k*CLop*CLop, LDop=CLop/CDop;
+  // stability
+  const acFrac=0.25+0.20*smooth(M,0.8,1.2);
+  const xAC=G.xLE_MAC+acFrac*G.MAC;        // along body length, nose=0
+  const xNP=xAC;                            // wing-body proxy (no tail model)
+  const xCG=cgFrac*G.Llen;
+  const SM=(xNP-xCG)/Math.max(G.MAC,1e-6);
+  return {atm,V,q,Re,Cf,FF,CD0,DqW,CDw,CDbase,CDbaseRaw,baseFill,Tdyn,CDwIdeal,arEff,CLa,e,k,pts,
+    ld,clOpt,cdOpt,alOpt, CLop,CDop,LDop,aoa,
+    acFrac,xAC,xNP,xCG,SM,Sref,
+    tc,camb,aL0,Cm0,Mdd,FFwing,FFbody};
+}
+
+/* ============================== Cp field (local-inclination) ============================== */
+function cpField(G,M,aoaDeg){
+  const a=aoaDeg*Math.PI/180;
+  // air-velocity direction in body frame (l forward at nose=0 so downstream = +l ... here nose at l=0, tail +l, so flow downstream = +l)
+  // relative wind travels nose->tail (+l) and, for +AoA, slightly upward in v
+  const f=[Math.cos(a),0,Math.sin(a)];           // unit flow direction (l,s,v)
+  const sup=M>1.05;
+  let Cpmax;
+  if(sup){const g=1.4,M2=M*M;
+    const p0=Math.pow((g+1)*(g+1)*M2/(4*g*M2-2*(g-1)),g/(g-1))*((1-g+2*g*M2)/(g+1));
+    Cpmax=(2/(g*M2))*(p0-1);
+  } else Cpmax=2;
+  const beta=Math.sqrt(Math.max(Math.abs(1-M*M),1e-3));
+  const vac=sup?-2/(1.4*M*M):-9;
+  const cp=new Float32Array(G.tris.length); let mn=1e9,mx=-1e9;
+  let cpNum=0,cpDen=0,spNum=0;   // for longitudinal & spanwise center of pressure (normal-force weighted)
+  G.tris.forEach((t,i)=>{
+    const[A,B,Cc]=t;
+    const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2], wx=Cc[0]-A[0],wy=Cc[1]-A[1],wz=Cc[2]-A[2];
+    let nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx;
+    const twoA=Math.hypot(nx,ny,nz),ln=twoA||1;nx/=ln;ny/=ln;nz/=ln;
+    const ns=G.normSign||1; nx*=ns;ny*=ns;nz*=ns;   // force outward regardless of remap parity / mesh winding
+    const area=0.5*twoA;
+    const ndf=nx*f[0]+ny*f[1]+nz*f[2];    // >0: normal points downstream => leeward
+    const sinT=-ndf;                       // windward if >0
+    let c;
+    if(sup){ c = sinT>0 ? Cpmax*sinT*sinT : Math.max(2*sinT/beta, vac); }
+    else   { c = 2*sinT/beta; }            // subsonic linear (qualitative)
+    cp[i]=c; if(c<mn)mn=c; if(c>mx)mx=c;
+    // pressure force per q on this face = -c*area*n̂; vertical (lift-ish) component uses n̂·v̂ = nz
+    const dFv = -c*area*nz;                // vertical-force contribution
+    const lc=(A[0]+B[0]+Cc[0])/3, sc2=(A[1]+B[1]+Cc[1])/3;
+    cpNum += dFv*lc; spNum += dFv*sc2; cpDen += dFv;
+  });
+  const xcp = Math.abs(cpDen)>1e-6 ? cpNum/cpDen : null;   // longitudinal center of pressure (body l)
+  const ycp = Math.abs(cpDen)>1e-6 ? spNum/cpDen : 0;
+  return {cp,mn,mx,Cpmax,sup,xcp,ycp};
+}
+
+/* ============================== Three.js viewer ============================== */
+let renderer,scene,cam,meshObj,wire;let yaw=-0.7,pitch=0.35,dist=2.6,target=new THREE.Vector3();
+let MARK=null, LASTPOS={cg:null,ac:null,cp:null};
+let AREAOV=null;  // equivalent-body area-distribution overlay (model + ideal), in the horizontal plane
+let IDEALPEAK=2/3;   // ideal-curve peak location: 0.5 (transonic Sears-Haack) or 0.667 (supersonic aft-shifted)
+const AREA_AMP=2.6;   // width amplification for readability (equivalent radius is otherwise slender)
+function mkAreaOverlay(){
+  const g=new THREE.Group();
+  const mkLine=(color,op)=>{const l=new THREE.Line(new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({color,depthTest:false,depthWrite:false,transparent:true,opacity:op}));
+    l.renderOrder=19;l.frustumCulled=false;return l;};
+  const fill=new THREE.Mesh(new THREE.BufferGeometry(),
+    new THREE.MeshBasicMaterial({color:0xff9d3c,depthTest:false,depthWrite:false,transparent:true,opacity:0.28,side:THREE.DoubleSide}));
+  fill.renderOrder=17;fill.frustumCulled=false;
+  const ideal=mkLine(0x9fb4c8,0.7), model=mkLine(0xffb454,1.0);
+  g.add(fill);g.add(ideal);g.add(model);g.visible=false;scene.add(g);
+  return {group:g,model,ideal,fill};
+}
+// build symmetric equivalent-body silhouette (half-width = AMP·sqrt(S/π)) in the X-Z plane, viewed from top
+function updateAreaOverlay(G){
+  if(!AREAOV||!G)return;
+  const sc=2/Math.max(G.Llen,G.Sext,G.Vext), N=G.Sx.length, L=G.Llen, A=AREA_AMP;
+  const peak=IDEALPEAK,bExp=1.5,aExp=bExp*peak/(1-peak); let Ish=0;const MI=400;
+  for(let q=0;q<MI;q++){const t=(q+0.5)/MI;Ish+=Math.pow(t,aExp)*Math.pow(1-t,bExp);} Ish/=MI;
+  const Kid=G.Vslices/Math.max(L*Ish,1e-9);
+  const halfW=(area)=>A*Math.sqrt(Math.max(area,0)/Math.PI)*sc;
+  const outline=(area_i)=>{
+    const top=[],bot=[];
+    for(let i=0;i<N;i++){const x=(i/(N-1)*L-L/2)*sc, w=halfW(area_i(i));
+      top.push(new THREE.Vector3(x,0,w)); bot.push(new THREE.Vector3(x,0,-w));}
+    return top.concat(bot.reverse()).concat([top[0]]);
+  };
+  const modelArea=i=>G.Sx[i], idealArea=i=>{const xi=i/(N-1);return Kid*Math.pow(xi,aExp)*Math.pow(1-xi,bExp);};
+  AREAOV.model.geometry.setFromPoints(outline(modelArea));
+  AREAOV.ideal.geometry.setFromPoints(outline(idealArea));
+  // filled ribbon for the model lobe (two triangles per segment)
+  const pos=new Float32Array((N-1)*18);
+  for(let i=0;i<N-1;i++){const x0=(i/(N-1)*L-L/2)*sc, x1=((i+1)/(N-1)*L-L/2)*sc, w0=halfW(G.Sx[i]), w1=halfW(G.Sx[i+1]);
+    const o=i*18;
+    pos[o]=x0;pos[o+1]=0;pos[o+2]=w0;    pos[o+3]=x1;pos[o+4]=0;pos[o+5]=w1;    pos[o+6]=x0;pos[o+7]=0;pos[o+8]=-w0;
+    pos[o+9]=x1;pos[o+10]=0;pos[o+11]=w1; pos[o+12]=x1;pos[o+13]=0;pos[o+14]=-w1; pos[o+15]=x0;pos[o+16]=0;pos[o+17]=-w0;
+  }
+  AREAOV.fill.geometry.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  AREAOV.fill.geometry.computeVertexNormals();
+  AREAOV.model.geometry.computeBoundingSphere();
+  AREAOV.ideal.geometry.computeBoundingSphere();
+  AREAOV.fill.geometry.computeBoundingSphere();
+}
+function mkMarker(color){
+  const g=new THREE.Group();
+  const s=new THREE.Mesh(new THREE.SphereGeometry(0.032,18,18),new THREE.MeshBasicMaterial({color,depthTest:false,transparent:true}));
+  s.renderOrder=20;
+  const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-0.5,0),new THREE.Vector3(0,0.5,0)]);
+  const ln=new THREE.Line(lg,new THREE.LineBasicMaterial({color,depthTest:false,transparent:true,opacity:0.8}));
+  ln.renderOrder=20;
+  g.add(s);g.add(ln);g.visible=false;scene.add(g);return g;
+}
+function applyMarkers(){
+  if(!GEO||!MARK)return;
+  const sc=2/Math.max(GEO.Llen,GEO.Sext,GEO.Vext);
+  for(const key of ['cg','ac','cp']){
+    const l=LASTPOS[key], on=document.getElementById('mk_'+key).checked;
+    const rd=document.getElementById('mkv_'+key);
+    if(rd)rd.textContent=(l!=null&&isFinite(l))?(l/GEO.Llen).toFixed(3):'—';
+    if(on&&l!=null&&isFinite(l)){MARK[key].position.set((l-GEO.Llen/2)*sc,0,0);MARK[key].visible=true;}
+    else MARK[key].visible=false;
+  }
+}
+function initGL(){
+  const cv=document.getElementById('gl');
+  renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+  scene=new THREE.Scene();
+  cam=new THREE.PerspectiveCamera(42,1,0.01,100);
+  scene.add(new THREE.AmbientLight(0xffffff,0.65));
+  const d1=new THREE.DirectionalLight(0xbfe9ff,0.7);d1.position.set(2,3,2);scene.add(d1);
+  const d2=new THREE.DirectionalLight(0x2a6070,0.5);d2.position.set(-2,-1,-2);scene.add(d2);
+  const grid=new THREE.GridHelper(4,16,0x1d3346,0x12202e);grid.position.y=-0.9;scene.add(grid);
+  MARK={cg:mkMarker(0xffb454),ac:mkMarker(0x34e6d6),cp:mkMarker(0xff6bd0)};
+  AREAOV=mkAreaOverlay();
+  resizeGL();
+  let drag=false,lx=0,ly=0;
+  cv.addEventListener('mousedown',e=>{drag=true;lx=e.clientX;ly=e.clientY;});
+  window.addEventListener('mouseup',()=>drag=false);
+  window.addEventListener('mousemove',e=>{if(!drag)return;yaw-=(e.clientX-lx)*0.008;pitch=clamp(pitch+(e.clientY-ly)*0.008,-1.4,1.4);lx=e.clientX;ly=e.clientY;});
+  cv.addEventListener('wheel',e=>{e.preventDefault();dist=clamp(dist*(1+Math.sign(e.deltaY)*0.08),0.6,12);},{passive:false});
+  (function loop(){requestAnimationFrame(loop);
+    cam.position.set(target.x+dist*Math.cos(pitch)*Math.sin(yaw),target.y+dist*Math.sin(pitch),target.z+dist*Math.cos(pitch)*Math.cos(yaw));
+    cam.lookAt(target);renderer.render(scene,cam);})();
+}
+function resizeGL(){const s=document.getElementById('stage');renderer.setSize(s.clientWidth,s.clientHeight,false);cam.aspect=s.clientWidth/s.clientHeight;cam.updateProjectionMatrix();}
+window.addEventListener('resize',()=>{if(renderer)resizeGL();});
+
+// diverging colormap blue->cyan->grey->amber->red
+function cmap(t){ // t in [0,1]
+  t=clamp(t,0,1);
+  const stops=[[0.18,0.42,0.95],[0.20,0.90,0.85],[0.62,0.70,0.78],[1.0,0.71,0.33],[1.0,0.30,0.36]];
+  const x=t*(stops.length-1),i=Math.min(stops.length-2,Math.floor(x)),f=x-i;
+  const a=stops[i],b=stops[i+1];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f,a[2]+(b[2]-a[2])*f];
+}
+/* ============================== supersonic flow geometry (exact) ============================== */
+let SHOCKOV=null;
+const _D2R=Math.PI/180,_R2D=180/Math.PI,_GAM=1.4;
+const machAngle=M=>Math.asin(1/Math.max(M,1.0001));
+const thetaOfBeta=(beta,M)=>{const s=Math.sin(beta);return Math.atan(2/Math.tan(beta)*(M*M*s*s-1)/(M*M*(_GAM+Math.cos(2*beta))+2));};
+function obliqueBeta(thetaDeg,M){const theta=thetaDeg*_D2R,mu=machAngle(M);let bMax=mu,tMax=-1;const N=720;
+  for(let i=0;i<=N;i++){const b=mu+(Math.PI/2-mu)*i/N,t=thetaOfBeta(b,M);if(t>tMax){tMax=t;bMax=b;}}
+  if(theta>tMax+1e-9)return {detached:true,thetaMax:tMax*_R2D};
+  let lo=mu,hi=bMax;for(let k=0;k<60;k++){const m=(lo+hi)/2;(thetaOfBeta(m,M)<theta)?lo=m:hi=m;}
+  return {detached:false,beta:((lo+hi)/2)*_R2D,thetaMax:tMax*_R2D};}
+const leNormalM=(M,sweepDeg)=>M*Math.cos(sweepDeg*_D2R);
+function noseSemiAngle(G){const S=G.Sx,x=G.xArr,n=S.length,rmax=Math.sqrt(G.Amax/Math.PI),tgt=0.5*rmax;
+  for(let i=1;i<n;i++){const r=Math.sqrt(Math.max(S[i],0)/Math.PI);if(r>=tgt&&x[i]>1e-6)return Math.atan(r/x[i]);}
+  return Math.atan(rmax/Math.max(x[n>>1],1e-6));}
+function coneLineSeg(apexX,alpha,Lc){const pts=[],ta=Math.tan(alpha),nSeg=44,nRad=12;
+  const ring=d=>{const r=d*ta,X=apexX+d,a=[];for(let i=0;i<=nSeg;i++){const th=2*Math.PI*i/nSeg;a.push([X,r*Math.sin(th),r*Math.cos(th)]);}return a;};
+  for(const fr of [0.34,0.67,1.0]){const rg=ring(fr*Lc);for(let i=0;i<nSeg;i++)pts.push(rg[i][0],rg[i][1],rg[i][2],rg[i+1][0],rg[i+1][1],rg[i+1][2]);}
+  const outer=ring(Lc);for(let i=0;i<nRad;i++){const k=Math.round(i*nSeg/nRad);pts.push(apexX,0,0,outer[k][0],outer[k][1],outer[k][2]);}
+  return new Float32Array(pts);}
+function ensureShockOv(){if(!SHOCKOV){SHOCKOV={group:new THREE.Group()};SHOCKOV.group.visible=false;scene.add(SHOCKOV.group);}}
+function updateShockOverlay(G,M){ensureShockOv();
+  while(SHOCKOV.group.children.length){const c=SHOCKOV.group.children.pop();c.geometry.dispose();SHOCKOV.group.remove(c);}
+  const note=$('shockNote');
+  if(M<=1.0){if(note)note.innerHTML='FLOW GEOM<br>M\u22641 \u00b7 no Mach cone';return;}
+  const sc=2/Math.max(G.Llen,G.Sext,G.Vext),apexX=(0-G.Llen/2)*sc,Lc=G.Llen*sc*1.35,mu=machAngle(M);
+  const mc=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x6f8aa3,transparent:true,opacity:0.45,depthTest:false}));
+  mc.geometry.setAttribute('position',new THREE.BufferAttribute(coneLineSeg(apexX,mu,Lc),3));SHOCKOV.group.add(mc);
+  const dN=noseSemiAngle(G),sh=obliqueBeta(dN*_R2D,M);
+  if(!sh.detached){const sk=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xff5d6c,transparent:true,opacity:0.8,depthTest:false}));
+    sk.geometry.setAttribute('position',new THREE.BufferAttribute(coneLineSeg(apexX,sh.beta*_D2R,Lc),3));SHOCKOV.group.add(sk);}
+  const mn=leNormalM(M,G.sweepLE),leC=Math.abs(mn-1)<0.03?'SONIC':(mn<1?'SUBSONIC':'SUPERSONIC');
+  const shTxt=sh.detached?('nose shock DETACHED (\u03b8\u2248'+(dN*_R2D).toFixed(1)+'\u00b0 > \u03b8max '+sh.thetaMax.toFixed(1)+'\u00b0)'):('nose \u03b8\u2248'+(dN*_R2D).toFixed(1)+'\u00b0 \u2192 \u03b2\u2248'+sh.beta.toFixed(1)+'\u00b0 <span style="opacity:.6">2D-wedge est</span>');
+  if(note)note.innerHTML='FLOW GEOM \u00b7 M '+M.toFixed(2)+
+    '<br><span style="color:#6f8aa3">\u2014\u2014</span> Mach cone \u03bc '+(mu*_R2D).toFixed(1)+'\u00b0'+
+    (sh.detached?'':'  <span style="color:#ff5d6c">\u2014\u2014</span> nose shock')+
+    '<br>LE sweep '+G.sweepLE.toFixed(1)+'\u00b0 \u00b7 M\u22a5 '+mn.toFixed(2)+' \u00b7 <b style="color:'+(leC==='SUBSONIC'?'#7ee0a0':leC==='SONIC'?'#ffd166':'#ff5d6c')+'">'+leC+' LE</b>'+
+    '<br>'+shTxt;}
+function buildMesh(G,field){
+  if(meshObj){scene.remove(meshObj);meshObj.geometry.dispose();}
+  if(wire){scene.remove(wire);wire.geometry.dispose();}
+  updateAreaOverlay(G);
+  const n=G.tris.length, pos=new Float32Array(n*9), col=new Float32Array(n*9);
+  // symmetric color scale around 0
+  const lim=Math.max(0.05,Math.max(Math.abs(field.mn),Math.abs(field.mx)));
+  // scale to longest extent ~2 units, center
+  const sc=2/Math.max(G.Llen,G.Sext,G.Vext);
+  G.tris.forEach((t,i)=>{
+    for(let j=0;j<3;j++){const v=t[j];
+      pos[i*9+j*3]=(v[0]-G.Llen/2)*sc; pos[i*9+j*3+1]=v[2]*sc; pos[i*9+j*3+2]=v[1]*sc;}
+    const tt=(field.cp[i]+lim)/(2*lim); const c=cmap(tt);
+    for(let j=0;j<3;j++){col[i*9+j*3]=c[0];col[i*9+j*3+1]=c[1];col[i*9+j*3+2]=c[2];}
+  });
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  geo.computeVertexNormals();
+  const mat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.55,metalness:0.15,flatShading:true,side:THREE.DoubleSide});
+  meshObj=new THREE.Mesh(geo,mat);scene.add(meshObj);
+  const wmat=new THREE.LineBasicMaterial({color:0x0a1018,transparent:true,opacity:0.25});
+  wire=new THREE.LineSegments(new THREE.WireframeGeometry(geo),wmat);scene.add(wire);
+  target.set(0,0,0); dist=2.6;
+  // colorbar
+  drawColorbar(field,lim);
+}
+function drawColorbar(field,lim){
+  const cb=document.getElementById('cbar');cb.style.display='flex';
+  const sc=document.getElementById('cbarScale');
+  let g='linear-gradient(90deg,';for(let i=0;i<=10;i++){const c=cmap(i/10);g+=`rgb(${(c[0]*255)|0},${(c[1]*255)|0},${(c[2]*255)|0}) ${i*10}%${i<10?',':''}`;}g+=')';
+  sc.style.background=g;
+  document.getElementById('cbLo').textContent=(-lim).toFixed(2);
+  document.getElementById('cbHi').textContent=(lim).toFixed(2);
+  document.getElementById('cbarCap').textContent=field.sup?'Cp · modified-Newtonian (supersonic)':'Cp · linearized (subsonic, qualitative)';
+}
+
+/* ============================== charts ============================== */
+function dpr(){return window.devicePixelRatio||1;}
+function setupCanvas(c,h){const r=dpr();c.width=c.clientWidth*r;c.height=h*r;const x=c.getContext('2d');x.setTransform(r,0,0,r,0,0);return[x,c.clientWidth,h];}
+function drawPolar(R){
+  const c=document.getElementById('polar');const[x,W,H]=setupCanvas(c,210);
+  x.clearRect(0,0,W,H);const m={l:46,r:12,t:12,b:30};
+  const xs=R.pts.map(p=>p.CD),ys=R.pts.map(p=>p.CL);
+  const cdMax=Math.max(...xs)*1.05,clMin=Math.min(...ys),clMax=Math.max(...ys);
+  const X=v=>m.l+(v/cdMax)*(W-m.l-m.r), Y=v=>H-m.b-((v-clMin)/(clMax-clMin))*(H-m.t-m.b);
+  // grid
+  x.strokeStyle='#13202f';x.fillStyle='#42566b';x.font='10px IBM Plex Mono';x.lineWidth=1;
+  for(let i=0;i<=4;i++){const cd=cdMax*i/4;x.beginPath();x.moveTo(X(cd),m.t);x.lineTo(X(cd),H-m.b);x.stroke();
+    x.fillText(cd.toFixed(3),X(cd)-12,H-m.b+13);}
+  for(let i=0;i<=4;i++){const cl=clMin+(clMax-clMin)*i/4;x.beginPath();x.moveTo(m.l,Y(cl));x.lineTo(W-m.r,Y(cl));x.stroke();
+    x.fillText(cl.toFixed(2),6,Y(cl)+3);}
+  x.fillStyle='#6f8aa3';x.fillText('CD',W-26,H-m.b+13);x.save();x.translate(11,m.t+8);x.rotate(-Math.PI/2);x.fillText('CL',0,0);x.restore();
+  // curve
+  x.strokeStyle='#ff9d3c';x.lineWidth=2;x.beginPath();R.pts.forEach((p,i)=>{const px=X(p.CD),py=Y(p.CL);i?x.lineTo(px,py):x.moveTo(px,py);});x.stroke();
+  // L/D max line from origin
+  x.strokeStyle='rgba(255,209,102,.45)';x.setLineDash([4,4]);x.beginPath();x.moveTo(X(0),Y(0));x.lineTo(X(R.cdOpt),Y(R.clOpt));x.stroke();x.setLineDash([]);
+  // operating point
+  const ox=X(R.CDop),oy=Y(R.CLop);x.fillStyle='#ffd166';x.beginPath();x.arc(ox,oy,4.5,0,7);x.fill();
+  x.strokeStyle='#ffd166';x.lineWidth=1;x.beginPath();x.arc(ox,oy,8,0,7);x.stroke();
+}
+function drawArea(G,R){
+  const c=document.getElementById('area');const[x,W,H]=setupCanvas(c,160);
+  x.clearRect(0,0,W,H);const m={l:30,r:10,t:10,b:22};
+  const N=G.Sx.length, Amax=Math.max(G.Amax,1e-9);
+  // low-wave-drag ideal matched to same volume & length, peak shifted aft to x/L = 2/3
+  // skewed form S ~ xi^a (1-xi)^b with peak at a/(a+b); b=1.5 (Sears-Haack-like tail), a from peak
+  const Vsh=G.Vslices, Lp=G.Llen, peak=IDEALPEAK, bExp=1.5, aExp=bExp*peak/(1-peak); // a=3 for peak 2/3, a=1.5 for 1/2
+  let Ish=0; const MI=400; for(let q=0;q<MI;q++){const t=(q+0.5)/MI;Ish+=Math.pow(t,aExp)*Math.pow(1-t,bExp);} Ish/=MI;
+  const Kideal=Vsh/Math.max(Lp*Ish,1e-9);
+  const idealMax=Kideal*Math.pow(peak,aExp)*Math.pow(1-peak,bExp);
+  const yMax=Math.max(Amax, idealMax)*1.1;
+  const X=i=>m.l+(i/(N-1))*(W-m.l-m.r), Y=a=>H-m.b-(a/yMax)*(H-m.t-m.b);
+  x.strokeStyle='#13202f';x.lineWidth=1;for(let i=0;i<=4;i++){const px=m.l+(W-m.l-m.r)*i/4;x.beginPath();x.moveTo(px,m.t);x.lineTo(px,H-m.b);x.stroke();}
+  x.fillStyle='#42566b';x.font='10px IBM Plex Mono';x.fillText('nose',m.l,H-7);x.fillText('tail',W-32,H-7);
+  // ideal
+  x.strokeStyle='#46586c';x.setLineDash([5,4]);x.lineWidth=1.4;x.beginPath();
+  for(let i=0;i<N;i++){const xi=i/(N-1),a=Kideal*Math.pow(xi,aExp)*Math.pow(1-xi,bExp);i?x.lineTo(X(i),Y(a)):x.moveTo(X(i),Y(a));}x.stroke();x.setLineDash([]);
+  // model fill
+  x.fillStyle='rgba(255,157,60,.12)';x.strokeStyle='#ff9d3c';x.lineWidth=2;x.beginPath();
+  for(let i=0;i<N;i++){const px=X(i),py=Y(G.Sx[i]);i?x.lineTo(px,py):x.moveTo(px,py);}
+  x.lineTo(X(N-1),Y(0));x.lineTo(X(0),Y(0));x.closePath();x.fill();
+  x.beginPath();for(let i=0;i<N;i++){const px=X(i),py=Y(G.Sx[i]);i?x.lineTo(px,py):x.moveTo(px,py);}x.stroke();
+}
+
+/* ============================== analysis sweeps ============================== */
+// Drag vs Mach: zero-lift drag buildup (CD0 + wave + base) across the speed range
+function drawDragSweep(cfg){
+  const c=document.getElementById('dragsweep');if(!c)return;const[x,W,H]=setupCanvas(c,170);
+  x.clearRect(0,0,W,H);const m={l:46,r:10,t:10,b:22};
+  const M0=0.2,M1=3.5,N=56,pts=[];let cdMax=1e-4;
+  for(let i=0;i<N;i++){const M=M0+(M1-M0)*i/(N-1);
+    const r=aero(GEO,Math.max(M,0.12),cfg.alt,cfg.cg,0,cfg.Tstatic,cfg.eng,cfg.wd,cfg.DqW);
+    const tot=r.CD0+r.CDw+r.CDbase;
+    pts.push({M,cd0:r.CD0,cdw:r.CDw,cdb:r.CDbase,tot});
+    if(tot>cdMax)cdMax=tot;}
+  cdMax*=1.12;
+  const X=M=>m.l+(M-M0)/(M1-M0)*(W-m.l-m.r), Y=cd=>H-m.b-(cd/cdMax)*(H-m.t-m.b);
+  x.strokeStyle='#13202f';x.lineWidth=1;x.fillStyle='#42566b';x.font='9px IBM Plex Mono';
+  for(let g=0;g<=4;g++){const cd=cdMax*g/4,py=Y(cd);x.beginPath();x.moveTo(m.l,py);x.lineTo(W-m.r,py);x.stroke();x.fillText(cd.toFixed(3),3,py+3);}
+  for(let M=0.5;M<=M1+1e-6;M+=0.5){const px=X(M);x.fillText('M'+M.toFixed(1),px-9,H-7);}
+  x.strokeStyle='#2a3a4d';x.setLineDash([3,3]);x.beginPath();x.moveTo(X(1),m.t);x.lineTo(X(1),H-m.b);x.stroke();x.setLineDash([]);
+  x.strokeStyle='rgba(255,209,102,.55)';x.lineWidth=1.4;x.beginPath();x.moveTo(X(Math.min(Math.max(cfg.M,M0),M1)),m.t);x.lineTo(X(Math.min(Math.max(cfg.M,M0),M1)),H-m.b);x.stroke();
+  const line=(key,col,wd)=>{x.strokeStyle=col;x.lineWidth=wd;x.beginPath();pts.forEach((p,i)=>{const px=X(p.M),py=Y(p[key]);i?x.lineTo(px,py):x.moveTo(px,py);});x.stroke();};
+  line('cd0','#6f8aa3',1.3);line('cdb','#9fb4c8',1.3);line('cdw','#ff5d6c',1.7);line('tot','#ff9d3c',2.3);
+}
+// Flight envelope: for each Mach/altitude cell, can the aircraft trim to level flight (L=W) within thrust & lift limits?
+function drawEnvelope(cfg){
+  const c=document.getElementById('envelope');if(!c)return;const[x,W,H]=setupCanvas(c,210);
+  x.clearRect(0,0,W,H);const m={l:42,r:10,t:10,b:22};
+  const M0=0.2,M1=3.0,A0=0,A1=24000,NX=30,NY=22;
+  const W_N=cfg.massT*1000*G0, aMax=15*Math.PI/180;
+  const pw=W-m.l-m.r, ph=H-m.t-m.b, cw=pw/NX, ch=ph/NY;
+  for(let j=0;j<NY;j++){const alt=A0+(A1-A0)*j/(NY-1);
+    for(let i=0;i<NX;i++){const M=M0+(M1-M0)*i/(NX-1);
+      const r=aero(GEO,Math.max(M,0.12),alt,cfg.cg,0,cfg.Tstatic,cfg.eng,cfg.wd,cfg.DqW);
+      const q=r.q,S=r.Sref,CLt=W_N/Math.max(q*S,1e-6),CLmax=r.CLa*(aMax-r.aL0);
+      let col;
+      if(CLt>CLmax||CLt<0) col='#3a4a5e';                              // lift-limited: not enough CL available
+      else{const D=(r.CD0+r.CDw+r.CDbase+r.k*CLt*CLt)*q*S;             // drag to hold level flight (N)
+           col=(r.Tdyn*1000>=D)?'#2e7d54':'#7a4030';}                  // green if installed thrust covers it
+      x.fillStyle=col;x.fillRect(m.l+i*cw, H-m.b-(j+1)*ch, cw+0.7, ch+0.7);
+    }}
+  x.fillStyle='#42566b';x.font='9px IBM Plex Mono';
+  for(let M=0.5;M<=M1+1e-6;M+=0.5){const px=m.l+(M-M0)/(M1-M0)*pw;x.fillText('M'+M.toFixed(1),px-9,H-7);}
+  for(let a=0;a<=24;a+=6){const py=H-m.b-(a*1000-A0)/(A1-A0)*ph;x.fillText(a+'k',5,py+3);}
+  const nx=m.l+(Math.min(Math.max(cfg.M,M0),M1)-M0)/(M1-M0)*pw;
+  const ny=H-m.b-(Math.min(Math.max(cfg.alt,A0),A1)-A0)/(A1-A0)*ph;
+  x.fillStyle='#ffd166';x.strokeStyle='#1a1208';x.lineWidth=1.5;x.beginPath();x.arc(nx,ny,5,0,7);x.fill();x.stroke();
+}
+// Reference comparison: where does this design land on the L/D-max vs thrust-to-weight map?
+function drawRefChart(cfg){
+  const c=document.getElementById('refchart');if(!c)return;const[x,W,H]=setupCanvas(c,190);
+  x.clearRect(0,0,W,H);const m={l:34,r:12,t:12,b:24};
+  const LD1=30,TW1=1.4;
+  const X=ld=>m.l+(Math.min(Math.max(ld,0),LD1))/LD1*(W-m.l-m.r);
+  const Y=tw=>H-m.b-(Math.min(Math.max(tw,0),TW1))/TW1*(H-m.t-m.b);
+  x.strokeStyle='#13202f';x.lineWidth=1;x.fillStyle='#42566b';x.font='9px IBM Plex Mono';
+  for(let g=0;g<=3;g++){const tw=TW1*g/3,py=Y(tw);x.beginPath();x.moveTo(m.l,py);x.lineTo(W-m.r,py);x.stroke();x.fillText(tw.toFixed(1),3,py+3);}
+  for(let ld=0;ld<=30;ld+=10){const px=X(ld);x.fillText(''+ld,px-4,H-9);}
+  x.fillText('L/D max →',W-74,H-9);x.save();x.translate(11,m.t+4);x.rotate(-Math.PI/2);x.fillText('← T/W',-30,0);x.restore();
+  const refs=[['C172',12,0.12,6,3],['747',17,0.27,-26,3],['737',17.5,0.30,6,-7],['G7500',18.5,0.28,6,9],['U-2',28,0.30,-20,3],['Concorde',7,0.37,8,5],['SR-71',6,0.44,8,-4],['Mirage2k',10,0.90,-58,3],['F-22',9,1.15,-32,2],['F-15',10,1.05,7,-3],['F-16',11,1.10,7,9]];
+  x.font='8px IBM Plex Mono';
+  refs.forEach(([nm,ld,tw,dx,dy])=>{const px=X(ld),py=Y(tw);
+    x.fillStyle='#6f8aa3';x.beginPath();x.arc(px,py,2.6,0,7);x.fill();
+    x.fillStyle='#8298ac';x.fillText(nm,px+(dx==null?5:dx),py+(dy==null?3:dy));});
+  const px=X(cfg.ld),py=Y(cfg.tw);
+  x.strokeStyle='#ff9d3c';x.lineWidth=2;x.beginPath();x.arc(px,py,6,0,7);x.stroke();
+  x.fillStyle='#ff9d3c';x.beginPath();x.arc(px,py,3,0,7);x.fill();
+  x.fillStyle='#ffd166';x.font='10px IBM Plex Mono';x.fillText('yours',px+9,py+3);
+}
+
+/* ============================== UI orchestration ============================== */
+let GEO=null;
+const $=id=>document.getElementById(id);
+function fmt(n,d=2){if(!isFinite(n))return'—';const a=Math.abs(n);if(a!==0&&(a<1e-3||a>=1e5))return n.toExponential(2);return n.toFixed(d);}
+/* ============================== radar cross-section (projected-area proxy) ============================== */
+let RCSDATA=null, RCS_K=-1, RCS_MODE='proj', SBRDATA=null, RCS_BVH=null, RCS_BFT=null, RCS_LAM=0.03, RCS_EDGES=null, RCS_EDGESPEC=null, RCS_EDGES_ON=false;
+const RCS_AZ=180, RCS_EL=[0,5,-5];
+function rcsDir(azDeg,elDeg){const a=azDeg*Math.PI/180,e=elDeg*Math.PI/180;return [Math.cos(e)*Math.cos(a),Math.cos(e)*Math.sin(a),Math.sin(e)];}
+// outward-normal facet list in a body frame (+x nose, +y right, +z up) from GEO's l,s,v (nose@l=0)
+function buildRcsTris(G){
+  const L=G.Llen,out=[];let vol=0;
+  for(const t of G.tris){
+    const A=[L/2-t[0][0],t[0][1],t[0][2]],B=[L/2-t[1][0],t[1][1],t[1][2]],C=[L/2-t[2][0],t[2][1],t[2][2]];
+    const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2],wx=C[0]-A[0],wy=C[1]-A[1],wz=C[2]-A[2];
+    let nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx;
+    const twoA=Math.hypot(nx,ny,nz)||1;
+    out.push({n:[nx/twoA,ny/twoA,nz/twoA],a:0.5*twoA});
+    vol+=A[0]*(B[1]*C[2]-B[2]*C[1])-A[1]*(B[0]*C[2]-B[2]*C[0])+A[2]*(B[0]*C[1]-B[1]*C[0]);
+  }
+  if(vol<0)for(const o of out){o.n[0]*=-1;o.n[1]*=-1;o.n[2]*=-1;}
+  return out;
+}
+function rcsProjA(tris,d){let a=0;for(const t of tris){const c=t.n[0]*d[0]+t.n[1]*d[1]+t.n[2]*d[2];if(c>0)a+=c*t.a;}return a;}  // metres assumed (s=1)
+function computeRCS(){
+  if(!GEO){RCSDATA=null;return;}
+  RCS_BVH=null;RCS_BFT=null;SBRDATA=null;RCS_EDGES=null;RCS_EDGESPEC=null;
+  const tris=buildRcsTris(GEO),mono={};
+  for(const el of RCS_EL){const arr=[];for(let i=0;i<RCS_AZ;i++){const az=i*360/RCS_AZ;arr.push({az,projA:rcsProjA(tris,rcsDir(az,el))});}mono[el]=arr;}
+  const CD=[['NOSE',0,0],['TAIL',180,0],['STBD',90,0],['PORT',270,0],['TOP',0,90],['BELLY',0,-90]];
+  RCSDATA={mono,card:CD.map(c=>({lab:c[0],projA:rcsProjA(tris,rcsDir(c[1],c[2]))}))};
+  if(RCS_EDGES_ON)computeEdgeSpec();
+  updateEdgeNote();
+  drawRCS();
+}
+function rcsDbsm(s){return s>0?10*Math.log10(s):-Infinity;}
+function fmtDbsm(s){if(!(s>0))return '\u2212\u221e dBsm';const d=10*Math.log10(s);return (d>=0?'+':'')+d.toFixed(1)+' dBsm';}
+function drawRcsPolar(maxS,minS){
+  const c=$('rcsPolar');if(!c)return;const[x,W,H]=setupCanvas(c,240);
+  x.clearRect(0,0,W,H);const cx=W/2,cy=H/2,R=Math.min(W,H)/2-22;
+  const dbMax=rcsDbsm(maxS),dbMin=Math.max(rcsDbsm(minS),dbMax-40),dbR=(dbMax-dbMin)||1;
+  const rOf=v=>{if(v<=0)return 0;return Math.max(0,Math.min(1,(rcsDbsm(v)-dbMin)/dbR))*R;};
+  x.font='9px IBM Plex Mono';
+  [-40,-30,-20,-10,0].forEach(dd=>{const db=dbMax+dd;if(db<dbMin-0.01)return;const r=R*(db-dbMin)/dbR;
+    x.strokeStyle='#13202f';x.lineWidth=1;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();
+    x.fillStyle='#33445a';x.textAlign='left';x.textBaseline='alphabetic';x.fillText((db>=0?'+':'')+db.toFixed(0),cx+3,cy-r+2);});
+  x.strokeStyle='#12202e';x.lineWidth=1;
+  for(let a=0;a<360;a+=30){const rad=(a-90)*Math.PI/180;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+R*Math.cos(rad),cy+R*Math.sin(rad));x.stroke();}
+  const lab={0:'F',90:'R',180:'A',270:'L'};x.fillStyle='#6f8aa3';x.textAlign='center';x.textBaseline='middle';
+  Object.keys(lab).forEach(a=>{const rad=(a-90)*Math.PI/180;x.fillText(lab[a],cx+(R+12)*Math.cos(rad),cy+(R+12)*Math.sin(rad));});
+  const f=Math.pow(10,RCS_K);
+  [[0,'#ff9d3c',2.0],[5,'#ffd166',1.3],[-5,'#6f8aa3',1.3]].forEach(tr=>{
+    const data=RCSDATA.mono[tr[0]];if(!data)return;
+    x.beginPath();data.forEach((p,i)=>{const rad=(p.az-90)*Math.PI/180,r=rOf(p.projA*f),px=cx+r*Math.cos(rad),py=cy+r*Math.sin(rad);i?x.lineTo(px,py):x.moveTo(px,py);});x.closePath();
+    x.globalAlpha=0.07;x.fillStyle=tr[1];x.fill();x.globalAlpha=1;x.strokeStyle=tr[1];x.lineWidth=tr[2];x.stroke();});
+  drawEdgeOverlay(x,cx,cy,R);
+  x.fillStyle='#42566b';x.beginPath();x.arc(cx,cy,2,0,7);x.fill();
+}
+function drawRcsProj(){
+  if(!RCSDATA)return;
+  const f=Math.pow(10,RCS_K);let mx=1e-30,mn=1e30;
+  for(const el of RCS_EL)for(const p of RCSDATA.mono[el]){const v=p.projA*f;if(v>mx)mx=v;if(v>0&&v<mn)mn=v;}
+  drawRcsPolar(mx,mn);
+  const rws=RCSDATA.card.map(c=>[c.lab,fmtDbsm(c.projA*f)]);
+  rws.push(['PEAK 360\u00b0',fmtDbsm(mx),'am']);rws.push(['MIN 360\u00b0',fmtDbsm(mn),'hi']);
+  rows($('rcsRows'),rws);
+}
+function updateRcsK(){
+  $('vRcsK').textContent=(RCS_K>=0?'+':'')+RCS_K.toFixed(2);
+  const pct=Math.pow(10,RCS_K)*100;
+  $('rcsKpct').textContent='\u00d7'+(pct>=10?pct.toFixed(0):pct.toFixed(1))+'%';
+  document.querySelectorAll('.rcsp').forEach(b=>{const on=Math.abs(parseFloat(b.dataset.k)-RCS_K)<0.06;b.style.color=on?'#ff9d3c':'';b.style.borderColor=on?'#ff9d3c':'';});
+}
+/* ====== RCS shoot-and-bounce (Tier 2): BVH + specular ray tracing ====== */
+function buildRcsFullTris(G){
+  const L=G.Llen,out=[];let vol=0;
+  for(const t of G.tris){
+    const A=[L/2-t[0][0],t[0][1],t[0][2]],B=[L/2-t[1][0],t[1][1],t[1][2]],C=[L/2-t[2][0],t[2][1],t[2][2]];
+    const ux=B[0]-A[0],uy=B[1]-A[1],uz=B[2]-A[2],wx=C[0]-A[0],wy=C[1]-A[1],wz=C[2]-A[2];
+    let nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx;const twoA=Math.hypot(nx,ny,nz)||1;
+    out.push({v:[A,B,C],n:[nx/twoA,ny/twoA,nz/twoA],A:0.5*twoA});
+    vol+=A[0]*(B[1]*C[2]-B[2]*C[1])-A[1]*(B[0]*C[2]-B[2]*C[0])+A[2]*(B[0]*C[1]-B[1]*C[0]);
+  }
+  if(vol<0)for(const o of out){o.n[0]*=-1;o.n[1]*=-1;o.n[2]*=-1;}
+  return out;
+}
+function rcsBVH(tris){
+  const items=tris.map((t,i)=>{let lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30];
+    for(const p of t.v)for(let k=0;k<3;k++){if(p[k]<lo[k])lo[k]=p[k];if(p[k]>hi[k])hi[k]=p[k];}
+    return{i,c:[(lo[0]+hi[0])/2,(lo[1]+hi[1])/2,(lo[2]+hi[2])/2],lo,hi};});
+  const bbox=arr=>{let lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30];
+    for(const it of arr)for(let k=0;k<3;k++){if(it.lo[k]<lo[k])lo[k]=it.lo[k];if(it.hi[k]>hi[k])hi[k]=it.hi[k];}return{lo,hi};};
+  const build=arr=>{const bb=bbox(arr);if(arr.length<=4)return{lo:bb.lo,hi:bb.hi,leaf:arr.map(it=>it.i)};
+    const e=[bb.hi[0]-bb.lo[0],bb.hi[1]-bb.lo[1],bb.hi[2]-bb.lo[2]],ax=e[0]>e[1]?(e[0]>e[2]?0:2):(e[1]>e[2]?1:2);
+    arr.sort((p,q)=>p.c[ax]-q.c[ax]);const m=arr.length>>1;return{lo:bb.lo,hi:bb.hi,L:build(arr.slice(0,m)),R:build(arr.slice(m))};};
+  return build(items);
+}
+function rcsHitT(o,d,T){const v=T.v;
+  const e1x=v[1][0]-v[0][0],e1y=v[1][1]-v[0][1],e1z=v[1][2]-v[0][2],e2x=v[2][0]-v[0][0],e2y=v[2][1]-v[0][1],e2z=v[2][2]-v[0][2];
+  const px=d[1]*e2z-d[2]*e2y,py=d[2]*e2x-d[0]*e2z,pz=d[0]*e2y-d[1]*e2x;const det=e1x*px+e1y*py+e1z*pz;
+  if(det>-1e-9&&det<1e-9)return -1;const inv=1/det;const tx=o[0]-v[0][0],ty=o[1]-v[0][1],tz=o[2]-v[0][2];
+  const u=(tx*px+ty*py+tz*pz)*inv;if(u<-1e-7||u>1+1e-7)return -1;
+  const qx=ty*e1z-tz*e1y,qy=tz*e1x-tx*e1z,qz=tx*e1y-ty*e1x;const vv=(d[0]*qx+d[1]*qy+d[2]*qz)*inv;
+  if(vv<-1e-7||u+vv>1+1e-7)return -1;const t=(e2x*qx+e2y*qy+e2z*qz)*inv;return t>1e-5?t:-1;}
+function rcsNearest(o,d,bvh,tris){const ix=1/d[0],iy=1/d[1],iz=1/d[2];let best=1e30,bt=null;const st=[bvh];
+  while(st.length){const nd=st.pop();let tmin=-1e30,tmax=1e30,a,b;
+    a=(nd.lo[0]-o[0])*ix;b=(nd.hi[0]-o[0])*ix;if(a>b){const sw=a;a=b;b=sw;}if(a>tmin)tmin=a;if(b<tmax)tmax=b;
+    a=(nd.lo[1]-o[1])*iy;b=(nd.hi[1]-o[1])*iy;if(a>b){const sw=a;a=b;b=sw;}if(a>tmin)tmin=a;if(b<tmax)tmax=b;
+    a=(nd.lo[2]-o[2])*iz;b=(nd.hi[2]-o[2])*iz;if(a>b){const sw=a;a=b;b=sw;}if(a>tmin)tmin=a;if(b<tmax)tmax=b;
+    if(tmax<Math.max(tmin,0)||tmin>best)continue;
+    if(nd.leaf){for(const i of nd.leaf){const t=rcsHitT(o,d,tris[i]);if(t>0&&t<best){best=t;bt=tris[i];}}}
+    else{st.push(nd.L);st.push(nd.R);}}
+  return bt?{t:best,tri:bt}:null;}
+function ensureRcsBVH(){if(RCS_BVH)return;RCS_BFT=buildRcsFullTris(GEO);RCS_BVH=rcsBVH(RCS_BFT);}
+function sbrAt(az,el,lam,Nb,Ng,R){
+  const a=az*Math.PI/180,e=el*Math.PI/180,rhat=[Math.cos(e)*Math.cos(a),Math.cos(e)*Math.sin(a),Math.sin(e)];
+  const up=Math.abs(rhat[2])>0.95?[0,1,0]:[0,0,1];
+  let ux=up[1]*rhat[2]-up[2]*rhat[1],uy=up[2]*rhat[0]-up[0]*rhat[2],uz=up[0]*rhat[1]-up[1]*rhat[0];
+  const ul=Math.hypot(ux,uy,uz)||1;ux/=ul;uy/=ul;uz/=ul;
+  const vx=rhat[1]*uz-rhat[2]*uy,vy=rhat[2]*ux-rhat[0]*uz,vz=rhat[0]*uy-rhat[1]*ux;
+  let umin=1e30,umax=-1e30,vmin=1e30,vmax=-1e30;
+  for(const t of RCS_BFT)for(const p of t.v){const pu=p[0]*ux+p[1]*uy+p[2]*uz,pv=p[0]*vx+p[1]*vy+p[2]*vz;
+    if(pu<umin)umin=pu;if(pu>umax)umax=pu;if(pv<vmin)vmin=pv;if(pv>vmax)vmax=pv;}
+  const pad=0.08*((umax-umin)+(vmax-vmin))+1e-3;umin-=pad;umax+=pad;vmin-=pad;vmax+=pad;
+  const du=(umax-umin)/Ng,dv=(vmax-vmin)/Ng,dA=du*dv;let sig=0;
+  for(let i=0;i<Ng;i++)for(let j=0;j<Ng;j++){
+    const pu=umin+(i+0.5)*du,pv=vmin+(j+0.5)*dv;
+    let ox=ux*pu+vx*pv+rhat[0]*1e3,oy=uy*pu+vy*pv+rhat[1]*1e3,oz=uz*pu+vz*pv+rhat[2]*1e3;
+    let dx=-rhat[0],dy=-rhat[1],dz=-rhat[2],w=1;
+    for(let b=0;b<Nb;b++){const h=rcsNearest([ox,oy,oz],[dx,dy,dz],RCS_BVH,RCS_BFT);if(!h)break;
+      const hx=ox+h.t*dx,hy=oy+h.t*dy,hz=oz+h.t*dz,n=h.tri.n,dn=dx*n[0]+dy*n[1]+dz*n[2];
+      dx-=2*dn*n[0];dy-=2*dn*n[1];dz-=2*dn*n[2];w*=R;
+      const ca=Math.max(-1,Math.min(1,dx*rhat[0]+dy*rhat[1]+dz*rhat[2])),ang=Math.acos(ca);
+      const th0=Math.max(0.012,Math.min(0.6,0.5*lam/Math.sqrt(h.tri.A)));
+      sig+=w*Math.exp(-(ang/th0)*(ang/th0))*dA;
+      ox=hx+1e-4*dx;oy=hy+1e-4*dy;oz=hz+1e-4*dz;}
+  }
+  return sig;
+}
+function sbrSweep(){
+  if(!GEO)return;ensureRcsBVH();
+  const lam=RCS_LAM,Nb=+$('sbrBounce').value,Ng=+$('sbrDens').value,R=+$('sbrRefl').value,mono={};
+  for(const el of RCS_EL){const arr=[];for(let i=0;i<RCS_AZ;i++){const az=i*360/RCS_AZ;arr.push({az,sig:sbrAt(az,el,lam,Nb,Ng,R)});}mono[el]=arr;}
+  const CD=[['NOSE',0,0],['TAIL',180,0],['STBD',90,0],['PORT',270,0],['TOP',0,90],['BELLY',0,-90]];
+  SBRDATA={mono,card:CD.map(c=>({lab:c[0],sig:sbrAt(c[1],c[2],lam,Nb,Ng,R)}))};
+  drawRCS();
+}
+/* ---- edge diffraction alignment indicator (relative) ---- */
+function buildRcsEdges(G){
+  const L=G.Llen,tris=[];let vol=0;
+  for(const t of G.tris){const A=[L/2-t[0][0],t[0][1],t[0][2]],B=[L/2-t[1][0],t[1][1],t[1][2]],C=[L/2-t[2][0],t[2][1],t[2][2]];
+    tris.push([A,B,C]);vol+=A[0]*(B[1]*C[2]-B[2]*C[1])-A[1]*(B[0]*C[2]-B[2]*C[0])+A[2]*(B[0]*C[1]-B[1]*C[0]);}
+  const flip=vol<0?-1:1;
+  let lo=[1e30,1e30,1e30],hi=[-1e30,-1e30,-1e30];
+  for(const t of tris)for(const p of t)for(let k=0;k<3;k++){if(p[k]<lo[k])lo[k]=p[k];if(p[k]>hi[k])hi[k]=p[k];}
+  const sc=Math.max(hi[0]-lo[0],hi[1]-lo[1],hi[2]-lo[2])||1,eps=sc*1e-5;
+  const key=p=>Math.round(p[0]/eps)+'_'+Math.round(p[1]/eps)+'_'+Math.round(p[2]/eps);
+  const map=new Map();
+  for(const t of tris){
+    const ux=t[1][0]-t[0][0],uy=t[1][1]-t[0][1],uz=t[1][2]-t[0][2],wx=t[2][0]-t[0][0],wy=t[2][1]-t[0][1],wz=t[2][2]-t[0][2];
+    let nx=uy*wz-uz*wy,ny=uz*wx-ux*wz,nz=ux*wy-uy*wx;const ln=Math.hypot(nx,ny,nz)||1;const n=[flip*nx/ln,flip*ny/ln,flip*nz/ln];
+    const E=[[t[0],t[1]],[t[1],t[2]],[t[2],t[0]]];
+    for(const pr of E){const ka=key(pr[0]),kb=key(pr[1]),k=ka<kb?ka+'|'+kb:kb+'|'+ka;let e=map.get(k);if(!e){e={a:pr[0],b:pr[1],ns:[]};map.set(k,e);}e.ns.push(n);}
+  }
+  const cosT=Math.cos(22*Math.PI/180),edges=[];
+  for(const e of map.values()){let sharp=e.ns.length===1;
+    if(!sharp&&e.ns.length>=2){const d=e.ns[0][0]*e.ns[1][0]+e.ns[0][1]*e.ns[1][1]+e.ns[0][2]*e.ns[1][2];if(d<cosT)sharp=true;}
+    if(sharp){const dx=e.b[0]-e.a[0],dy=e.b[1]-e.a[1],dz=e.b[2]-e.a[2],Ln=Math.hypot(dx,dy,dz)||1e-6;edges.push({d:[dx/Ln,dy/Ln,dz/Ln],L:Ln,ns:e.ns});}}
+  return edges;
+}
+function edgeSpectrum(edges,el,lam,N){
+  const e0=el*Math.PI/180,out=[];
+  for(let i=0;i<N;i++){const az=i*360/N,a=az*Math.PI/180,rx=Math.cos(e0)*Math.cos(a),ry=Math.cos(e0)*Math.sin(a),rz=Math.sin(e0);
+    let E=0;
+    for(const e of edges){let il=false;for(const n of e.ns){if(n[0]*rx+n[1]*ry+n[2]*rz>-0.15){il=true;break;}}if(!il)continue;
+      let c=e.d[0]*rx+e.d[1]*ry+e.d[2]*rz;if(c>1)c=1;else if(c<-1)c=-1;
+      const beta=Math.asin(Math.abs(c)),b0=Math.max(0.014,Math.min(0.14,lam/e.L));
+      E+=e.L*Math.exp(-(beta/b0)*(beta/b0));}
+    out.push({az,E});}
+  return out;
+}
+function ensureRcsEdges(){if(!RCS_EDGES&&GEO)RCS_EDGES=buildRcsEdges(GEO);}
+function computeEdgeSpec(){ensureRcsEdges();if(RCS_EDGES)RCS_EDGESPEC=edgeSpectrum(RCS_EDGES,0,RCS_LAM,360);}
+function edgePeaks(){if(!RCS_EDGESPEC)return [];const s=RCS_EDGESPEC,mx=Math.max.apply(null,s.map(p=>p.E))||1,th=0.45*mx,out=[];
+  for(let i=0;i<s.length;i++){const pr=s[(i-1+s.length)%s.length].E,nx=s[(i+1)%s.length].E;if(s[i].E>=th&&s[i].E>=pr&&s[i].E>nx)out.push(Math.round(s[i].az));}
+  return out;}
+function updateEdgeNote(){const en=$('rcsEdgeNote');if(!en)return;
+  if(RCS_EDGES_ON&&RCS_EDGESPEC){const pk=edgePeaks();en.style.display='';
+    en.innerHTML='Edge spikes \u2014 '+(pk.length?pk.length+' direction'+(pk.length>1?'s':'')+': '+pk.map(a=>a+'\u00b0').join('  '):'none above threshold')+'.  Fewer/clustered = better aligned. Relative indicator; magnitude not calibrated.';}
+  else en.style.display='none';}
+function drawEdgeOverlay(x,cx,cy,R){
+  if(!RCS_EDGES_ON||!RCS_EDGESPEC)return;
+  const mx=Math.max.apply(null,RCS_EDGESPEC.map(p=>p.E))||1;
+  const rOf=v=>{if(v<=0)return 0;const db=10*Math.log10(v/mx);return Math.max(0,Math.min(1,(db+40)/40))*R;};
+  x.setLineDash([4,3]);x.strokeStyle='#c77dff';x.lineWidth=1.4;x.beginPath();
+  RCS_EDGESPEC.forEach((p,i)=>{const rad=(p.az-90)*Math.PI/180,r=rOf(p.E),px=cx+r*Math.cos(rad),py=cy+r*Math.sin(rad);i?x.lineTo(px,py):x.moveTo(px,py);});
+  x.closePath();x.stroke();x.setLineDash([]);
+}
+function drawRcsSBR(){
+  const c=$('rcsPolar');if(!c)return;const[x,W,H]=setupCanvas(c,240);
+  x.clearRect(0,0,W,H);const cx=W/2,cy=H/2,R=Math.min(W,H)/2-22;x.font='9px IBM Plex Mono';
+  if(!SBRDATA){x.fillStyle='#6f8aa3';x.textAlign='center';x.textBaseline='middle';x.fillText('press Compute',cx,cy);rows($('rcsRows'),[['ray-trace','not computed yet']]);return;}
+  let mx=1e-30,mn=1e30;for(const el of RCS_EL)for(const p of SBRDATA.mono[el]){if(p.sig>mx)mx=p.sig;if(p.sig>0&&p.sig<mn)mn=p.sig;}
+  const dbMin=-40,dbR=40,rOf=v=>{if(v<=0)return 0;const db=10*Math.log10(v/mx);return Math.max(0,Math.min(1,(db-dbMin)/dbR))*R;};
+  [0,-10,-20,-30,-40].forEach(db=>{const r=R*(db-dbMin)/dbR;x.strokeStyle='#13202f';x.lineWidth=1;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke();x.fillStyle='#33445a';x.textAlign='left';x.textBaseline='alphabetic';x.fillText(db.toFixed(0),cx+3,cy-r+2);});
+  x.strokeStyle='#12202e';x.lineWidth=1;for(let aa=0;aa<360;aa+=30){const rad=(aa-90)*Math.PI/180;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+R*Math.cos(rad),cy+R*Math.sin(rad));x.stroke();}
+  const lab={0:'F',90:'R',180:'A',270:'L'};x.fillStyle='#6f8aa3';x.textAlign='center';x.textBaseline='middle';Object.keys(lab).forEach(aa=>{const rad=(aa-90)*Math.PI/180;x.fillText(lab[aa],cx+(R+12)*Math.cos(rad),cy+(R+12)*Math.sin(rad));});
+  [[0,'#ff9d3c',2.0],[5,'#ffd166',1.3],[-5,'#6f8aa3',1.3]].forEach(tr=>{const data=SBRDATA.mono[tr[0]];if(!data)return;
+    x.beginPath();data.forEach((p,i)=>{const rad=(p.az-90)*Math.PI/180,r=rOf(p.sig),px=cx+r*Math.cos(rad),py=cy+r*Math.sin(rad);i?x.lineTo(px,py):x.moveTo(px,py);});x.closePath();
+    x.globalAlpha=0.07;x.fillStyle=tr[1];x.fill();x.globalAlpha=1;x.strokeStyle=tr[1];x.lineWidth=tr[2];x.stroke();});
+  drawEdgeOverlay(x,cx,cy,R);
+  x.fillStyle='#42566b';x.beginPath();x.arc(cx,cy,2,0,7);x.fill();x.textAlign='right';x.textBaseline='alphabetic';x.fillText('rel dB',W-4,H-4);
+  const fr=v=>v>0?((10*Math.log10(v/mx)>=0?'+':'')+(10*Math.log10(v/mx)).toFixed(1)+' dB'):'\u2212\u221e';
+  const rws=SBRDATA.card.map(cd=>[cd.lab,fr(cd.sig)]);rws.push(['PEAK aspect','0.0 dB','am']);rws.push(['QUIETEST',fr(mn),'hi']);rows($('rcsRows'),rws);
+}
+function drawRCS(){ if(RCS_MODE==='sbr') drawRcsSBR(); else drawRcsProj(); }
+function rows(el,arr){el.innerHTML=arr.map(([k,v,cls])=>`<div class="k">${k}</div><div class="v ${cls||''}">${v}</div>`).join('');}
+
+function recompute(){
+  if(!GEO)return;
+  const M=+$('sMach').value, alt=+$('sAlt').value, aoa=+$('sAoa').value, cg=+$('sCg').value/100;
+  const R=aero(GEO,M,alt,cg,aoa,+$('sT').value,$('engType').value,+$('sWd').value);
+  const F=cpField(GEO,M,aoa);
+  buildMesh(GEO,F);
+  LASTPOS.cg=cg*GEO.Llen; LASTPOS.ac=R.xAC; LASTPOS.cp=F.xcp; applyMarkers();
+  // geometry rows
+  rows($('geoRows'),[
+    ['Length (long.)',fmt(GEO.Llen,2)],
+    ['Span',fmt(GEO.span,2)],
+    ['Wetted area',fmt(GEO.Swet,1)],
+    ['Planform area (ref)',fmt(GEO.Splan,2),'hi'],
+    ['Volume',fmt(GEO.Vol,2)],
+    ['Aspect ratio',fmt(GEO.AR,2),'hi'],
+    ['Mean aero chord',fmt(GEO.MAC,2)],
+    ['LE sweep',fmt(GEO.sweepLE,1)+'°'],
+    ['Max cross-section',fmt(GEO.Amax,3)],
+    ['Fineness L/d',fmt(GEO.Llen/GEO.deq,1)],
+    ['Wing t/c',GEO.tcValid?fmt(GEO.tc*100,1)+'%':'n/a',GEO.tcValid?'hi':''],
+    ['Wing camber',GEO.tcValid?fmt(GEO.camber*100,1)+'%':'n/a'],
+  ]);
+  $('triCount').textContent=GEO.nTri.toLocaleString()+' tri';
+  // performance
+  $('ldmax').textContent=fmt(R.ld,1);
+  $('clopt').textContent=fmt(R.clOpt,2);
+  LASTQ=R.q; LASTCLop=R.CLop; LASTS=R.Sref; LASTRHO=R.atm.rho; LASTM=M; LASTV=R.V; LASTLDop=R.LDop; LASTCDop=R.CDop; LASTTDYN=R.Tdyn; LASTCLA=R.CLa; LASTAL0=R.aL0; updateForces();
+  rows($('perfRows'),[
+    ['CD0 (friction+form)',fmt(R.CD0,4)],
+    ['Wave drag CDw',fmt(R.CDw,4),R.CDw>1e-4?'am':''],
+    ['Base drag CDbase'+(R.baseFill>0.02?' · jet −'+Math.round(R.baseFill*100)+'%':''),fmt(R.CDbase,4),R.CDbase>1e-4?'am':''],
+    ['Induced factor k',fmt(R.k,3)],
+    ['Oswald e',fmt(R.e,2)],
+    ['CL_α',fmt(R.CLa,2)+' /rad'],
+    ['Reynolds',fmt(R.Re,0)],
+    ['Dynamic press. q',fmt(R.q/1000,1)+' kPa'],
+    ['TAS',fmt(R.V,0)+' m/s'],
+    ['Area-rule eff.'+(WDTABLE?' @M'+(+$('sMach').value).toFixed(1):''),fmt(R.arEff*100,0)+'%',R.arEff>0.7?'hi':'am'],
+    [`L/D @ AoA ${aoa}°`,fmt(R.LDop,1),'hi'],
+  ]);
+  $('polarCond').textContent=`M ${M.toFixed(2)} · ${(alt/1000).toFixed(1)} km`;
+  drawPolar(R); drawArea(GEO,R);
+  // stability
+  rows($('stabRows'),[
+    ['Aero center (×MAC)',fmt(R.acFrac,3)],
+    ['AC station (×L)',fmt(R.xAC/GEO.Llen,3)],
+    ['Neutral point (×L)',fmt(R.xNP/GEO.Llen,3),'hi'],
+    ['CG station (×L)',fmt(cg,3),'am'],
+    ['Static margin',fmt(R.SM*100,1)+'%'],
+    ['Zero-lift α (camber)',GEO.tcValid?fmt(R.aL0*180/Math.PI,2)+'°':'n/a'],
+    ['Cm0 (zero-lift)',GEO.tcValid?fmt(R.Cm0,3):'n/a',GEO.tcValid&&Math.abs(R.Cm0)>0.01?'am':''],
+  ]);
+  const p=$('smPill');const sm=R.SM*100;
+  if(sm>3&&sm<25){p.className='pill good';p.textContent='STABLE '+sm.toFixed(1)+'%';}
+  else if(sm>=0&&sm<=35){p.className='pill warn';p.textContent=(sm<3?'MARGINAL ':'STIFF ')+sm.toFixed(1)+'%';}
+  else{p.className='pill bad';p.textContent=(sm<0?'UNSTABLE ':'OVER-STIFF ')+sm.toFixed(1)+'%';}
+  // hud
+  $('hud').innerHTML=`MODE <b>${F.sup?'SUPERSONIC':'SUBSONIC'}</b><br>MACH <b>${M.toFixed(2)}</b> · ALT <b>${(alt/1000).toFixed(1)} km</b><br>AOA <b>${aoa.toFixed(1)}°</b> · Cp_max <b>${F.Cpmax.toFixed(2)}</b>`;
+  if($('mk_shock').checked&&GEO)updateShockOverlay(GEO,M);
+  $('stamp').innerHTML=`L/D <b>${R.ld.toFixed(1)}</b><br>SM <b>${(R.SM*100).toFixed(1)}%</b>`;
+  // method note
+  $('methodNote').innerHTML = F.sup
+    ? `Drag: turbulent flat-plate <b>Cf</b> × form factor (body fineness blended with a t/c wing form factor) + von-Kármán slender-body wave drag (faired afterbody, low-mode to reject rasterization noise) + a separate <b>base-drag</b> term (Cp_base≈−1/M²) for the tail area, reduced when the engine is running (the jet fills the nozzle). Lift: linearized supersonic <b>CL_α=4/√(M²−1)</b>. Cp: modified-Newtonian (windward) + linear expansion (leeward) — most accurate regime. ${GEO.tcValid?`Thickness/camber from <b>${GEO.tcStations}</b> sections.`:''} AC/NP are a wing-body proxy (no tail model).`
+    : `Drag: turbulent flat-plate <b>Cf</b> × form factor (t/c wing form factor) + induced CL²/(πeAR); transonic wave-drag onset set by the <b>Korn drag-divergence Mach</b> from t/c & sweep. Lift: DATCOM finite-wing <b>CL_α</b> (Prandtl-Glauert), shifted by a camber zero-lift angle <b>α_L0=−2·(camber/c)</b>; <b>Cm0=−π·(camber/c)</b>. ${GEO.tcValid?`t/c & camber from <b>${GEO.tcStations}</b> sections.`:'<b>Flat-plate fallback</b> (no wing-like sections found).'} Cp map qualitative below M≈1; NP is a wing-body proxy with no tail.`;
+  $('empty').style.display='none';
+  // analysis sweeps (reuse precomputed faired wave drag for speed)
+  const DqW0=waveDragFaired(GEO.Sx,GEO.Llen,GEO.Abase);
+  const cfg={alt, cg, Tstatic:+$('sT').value, eng:$('engType').value, wd:+$('sWd').value, massT:+$('sW').value, M, DqW:DqW0, ld:R.ld, tw:((+$('sW').value)>0?(+$('sT').value)/((+$('sW').value)*G0):0)};
+  LASTCFG=cfg; drawDragSweep(cfg); drawEnvelope(cfg); drawRefChart(cfg);
+}
+
+let RAWTRIS=null;       // last raw mesh (uploaded or demo)
+function rebuild(){
+  if(!RAWTRIS)return;
+  const useVox=$('vox').checked, res=+$('voxRes').value;
+  $('spin').classList.add('on');$('spinTxt').textContent=useVox?'VOXEL REMESH':'ANALYZING GEOMETRY';
+  setTimeout(()=>{
+    try{
+      let tris=RAWTRIS, cleaned=null;
+      if(useVox){ cleaned=remeshTris(RAWTRIS,res); tris=cleaned; }
+      GEO=analyzeGeometry(tris,$('axis').value,$('nose').value);
+      recompute();
+      computeRCS();
+      $('voxNote').innerHTML = useVox
+        ? `Cleaned: <b>${RAWTRIS.length.toLocaleString()}</b> → <b>${cleaned.length.toLocaleString()}</b> tri · watertight, outward normals. Fixes flipped faces, duplicates, self-intersections & small gaps; volume & wetted area now reliable. Sharp edges round to ~1 voxel and <b>thin/open surfaces inflate</b> — raise res to sharpen. Best on solid models.`
+        : `Analyzing raw mesh. Enable voxel cleanup if a model's normals/volume look wrong (flipped faces, duplicates, self-intersections, small gaps).`;
+    }catch(err){ console.error(err); $('spinTxt').textContent='ERROR: '+err.message; setTimeout(()=>$('spin').classList.remove('on'),1500); return; }
+    $('spin').classList.remove('on');
+  },30);
+}
+function loadTris(tris){ RAWTRIS=tris; rebuild(); }
+
+// demo: parametric delta-wing jet (fuselage body of revolution + delta wing + fin)
+function demoJet(){
+  const T=[];
+  const Lf=10, nx=40, nth=20;
+  const rad=x=>{const xi=clamp(x/Lf,0,1);return 0.62*Math.pow(4*xi*(1-xi),0.72)+0.02;}; // smooth body
+  const ring=x=>{const r=rad(x),a=[];for(let j=0;j<nth;j++){const th=2*Math.PI*j/nth;a.push([x,r*Math.cos(th),r*Math.sin(th)]);}return a;};
+  for(let i=0;i<nx;i++){const x0=Lf*i/nx,x1=Lf*(i+1)/nx,r0=ring(x0),r1=ring(x1);
+    for(let j=0;j<nth;j++){const k=(j+1)%nth;T.push([r0[j],r0[k],r1[j]]);T.push([r0[k],r1[k],r1[j]]);}}
+  // delta wing (root at x 4.5..9, tip at x 7.5..8.7), thin
+  const wing=(yz)=>{const s=yz, root=[[4.5,0,0],[9.0,0,0]], tipLE=7.6, tipTE=8.7, b=3.2;
+    const seg=12;for(let i=0;i<seg;i++){const f0=i/seg,f1=(i+1)/seg;
+      const y0=b*f0,y1=b*f1;
+      const le0=4.5+(tipLE-4.5)*f0, te0=9.0+(tipTE-9.0)*f0;
+      const le1=4.5+(tipLE-4.5)*f1, te1=9.0+(tipTE-9.0)*f1;
+      const t=0.10*(1-f0); // half-thickness taper
+      // upper & lower simple wedge
+      const A=[le0,s*y0,t],B=[te0,s*y0,-t*0.3],Cc=[le1,s*y1,t*0.9],D=[te1,s*y1,-t*0.27];
+      T.push([A,B,Cc]);T.push([B,D,Cc]);
+      const A2=[le0,s*y0,-t],B2=[te0,s*y0,t*0.3],Cc2=[le1,s*y1,-t*0.9],D2=[te1,s*y1,t*0.27];
+      T.push([A2,Cc2,B2]);T.push([B2,Cc2,D2]);
+    }};
+  wing(1);wing(-1);
+  // vertical fin
+  const fin=()=>{const seg=8;for(let i=0;i<seg;i++){const f0=i/seg,f1=(i+1)/seg;
+    const x0r=7.2,x1r=9.4,h=1.6;const le0=7.2+(8.6-7.2)*f0,te0=9.4+(9.2-9.4)*f0,le1=7.2+(8.6-7.2)*f1,te1=9.4+(9.2-9.4)*f1;
+    const z0=0.5+ (h-0.5)*f0, z1=0.5+(h-0.5)*f1, t=0.05*(1-f0);
+    T.push([[le0,t,z0],[te0,-t,z0],[le1,t,z1]]);T.push([[te0,-t,z0],[te1,-t,z1],[le1,t,z1]]);};};
+  fin();
+  loadTris(T);
+}
+
+// wiring
+function bindSlider(id,fn){const s=$(id);s.addEventListener('input',()=>{fn(s.value);clearTimeout(s.__t);s.__t=setTimeout(recompute,40);});}
+bindSlider('sMach',v=>$('vMach').textContent=(+v).toFixed(2));
+bindSlider('sAlt', v=>$('vAlt').textContent=(v/1000).toFixed(1)+' km');
+bindSlider('sAoa', v=>$('vAoa').textContent=(+v).toFixed(1)+'°');
+bindSlider('sCg',  v=>$('vCg').textContent=v+'%');
+bindSlider('sWd',  v=>$('vWd').textContent=(+v).toFixed(2));
+let LASTQ=null,LASTCLop=null,LASTS=null,LASTRHO=null,LASTM=null,LASTV=null,LASTLDop=null,LASTCDop=null,LASTTDYN=null,LASTCLA=null,LASTAL0=null,LASTCFG=null;
+const G0=9.80665;
+const ENGLABEL={high:'high-bypass',low:'turbojet',prop:'propeller'};
+// solve AoA that makes lift balance weight (L/W = 1) at the current Mach/altitude/mass
+function trimToLevel(){
+  if(!GEO||LASTQ==null||!LASTCLA){return;}
+  const W_N=(+$('sW').value)*1000*G0;                 // mass (t) -> kg -> N
+  const CLtarget=W_N/Math.max(LASTQ*LASTS,1e-6);
+  let aDeg=(LASTAL0 + CLtarget/LASTCLA)*180/Math.PI;  // alpha = aL0 + CL/CLalpha
+  const s=$('sAoa'), lo=+s.min, hi=+s.max, st=+s.step;
+  const clamped=Math.max(lo,Math.min(hi,aDeg));
+  s.value=(Math.round(clamped/st)*st).toFixed(1);
+  $('vAoa').textContent=(+s.value).toFixed(1)+'°';
+  recompute();
+  // flag if the trim AoA fell outside the slider's range
+  const note=$('fpaNote');
+  if(aDeg>hi||aDeg<lo) note.textContent='trim AoA '+aDeg.toFixed(1)+'° is outside the slider range — L/W cannot reach 1 at this speed';
+}
+function updateForces(){
+  const massT=+$('sW').value, Tstatic=+$('sT').value, type=$('engType').value;
+  $('vW').textContent=massT; $('vT').textContent=Tstatic;
+  const W_kN=massT*G0;                              // weight (kN) = mass(t)*g
+  let Tdyn=Tstatic, note='set Mach / altitude to estimate installed thrust';
+  if(LASTTDYN!=null){
+    Tdyn=LASTTDYN;
+    const pct=Tstatic>0?Math.round(100*Tdyn/Tstatic):0;
+    note='Installed thrust ≈ '+Tdyn.toFixed(0)+' kN  ('+pct+'% of static · '+ENGLABEL[type]+')';
+  }
+  $('thrustNote').textContent=note;
+  const tw = W_kN>0 ? Tdyn/W_kN : 0;
+  $('tw').textContent = W_kN>0 ? tw.toFixed(2) : '—';
+  const td=$('td');
+  if(LASTQ!=null&&LASTS!=null&&LASTCDop!=null){
+    const Drag=LASTCDop*LASTQ*LASTS/1000;            // kN, drag at operating AoA
+    if(Drag>1e-6){
+      const r=Tdyn/Drag;
+      td.textContent=r.toFixed(2);
+      td.style.color = r>1.02?'#4ade80':(r<0.98?'var(--red)':'var(--ink)');  // thrust vs drag
+    } else { td.textContent='—'; td.style.color='var(--ink)'; }
+  } else { td.textContent='—'; td.style.color='var(--ink)'; }
+  const fpa=$('fpa'), fnote=$('fpaNote');
+  if(LASTQ!=null&&LASTS!=null&&W_kN>0&&LASTLDop){
+    const Lift=LASTCLop*LASTQ*LASTS/1000, lw=Lift/W_kN;   // kN, ratio
+    $('lw').textContent=lw.toFixed(2);
+    // steady flight-path angle: sin(gamma) = T/W - 1/(L/D)  (trimmed flight, L=W)
+    const g=Math.asin(clamp(tw-1/LASTLDop,-1,1))*180/Math.PI;
+    fpa.textContent=(g>=0?'+':'')+g.toFixed(1)+'°';
+    const trimmed=Math.abs(lw-1)<=0.15;
+    fpa.style.color = !trimmed ? 'var(--ink-faint)' : (g>0.15?'#4ade80':(g<-0.15?'var(--red)':'var(--ink)'));
+    fnote.textContent = trimmed
+      ? 'γ: steady climb/descent angle (lift balances weight here)'
+      : 'γ assumes trimmed flight — adjust AoA/speed so L/W→1 (now '+lw.toFixed(2)+') to sustain it';
+  } else { $('lw').textContent='—'; fpa.textContent='—'; fpa.style.color='var(--ink)'; fnote.textContent=''; }
+}
+function redrawMassCharts(){
+  if(!GEO||!LASTCFG)return;
+  const c=Object.assign({},LASTCFG);
+  c.massT=+$('sW').value;
+  c.tw=(c.massT>0)?(+$('sT').value)/(c.massT*G0):0;
+  drawEnvelope(c); drawRefChart(c);   // mass only affects weight-derived charts; skip Cp/mesh recompute
+}
+$('sW').addEventListener('input',()=>{updateForces(); redrawMassCharts();});
+$('sT').addEventListener('input',recompute);
+$('engType').addEventListener('change',recompute);
+$('axis').addEventListener('change',rebuild);
+$('nose').addEventListener('change',rebuild);
+$('vox').addEventListener('change',rebuild);
+$('voxRes').addEventListener('input',()=>{$('voxResV').textContent=$('voxRes').value;clearTimeout(window.__vt);if($('vox').checked)window.__vt=setTimeout(rebuild,250);});
+$('bDemo').addEventListener('click',demoJet);
+['cg','ac','cp'].forEach(k=>$('mk_'+k).addEventListener('change',applyMarkers));
+$('mk_area').addEventListener('change',()=>{if(!AREAOV)return;if($('mk_area').checked&&GEO)updateAreaOverlay(GEO);AREAOV.group.visible=$('mk_area').checked;});
+$('mk_shock').addEventListener('change',()=>{const on=$('mk_shock').checked;ensureShockOv();const M=+$('sMach').value;if(on&&GEO)updateShockOverlay(GEO,M);SHOCKOV.group.visible=on;$('shockNote').style.display=on?'':'none';if(!on)$('shockNote').innerHTML='';});
+$('idealPeak').addEventListener('change',()=>{IDEALPEAK=+$('idealPeak').value;$('peakLab').textContent='peak '+(IDEALPEAK<0.55?'0.50':'0.67')+'L';if(GEO)recompute();});
+$('bTrim').addEventListener('click',trimToLevel);
+// ---- design state save / load ----
+function gatherState(){
+  return {v:1, label:$('stateLabel').value||'',
+    mach:+$('sMach').value, alt:+$('sAlt').value, aoa:+$('sAoa').value, cg:+$('sCg').value,
+    mass:+$('sW').value, thrust:+$('sT').value, eng:$('engType').value, wd:+$('sWd').value,
+    peak:$('idealPeak').value, axis:$('axis').value, nose:$('nose').value};
+}
+function saveState(){
+  const st=gatherState();
+  const blob=new Blob([JSON.stringify(st,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=url; a.download='aeroscope-'+(st.label?st.label.replace(/[^\w-]+/g,'_'):'state')+'.json';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function applyState(st){
+  const set=(id,v)=>{if(v!=null&&$(id))$(id).value=v;};
+  set('sMach',st.mach);set('sAlt',st.alt);set('sAoa',st.aoa);set('sCg',st.cg);
+  set('sW',st.mass);set('sT',st.thrust);set('sWd',st.wd);
+  set('engType',st.eng);set('idealPeak',st.peak);set('axis',st.axis);set('nose',st.nose);
+  if(st.label!=null)$('stateLabel').value=st.label;
+  if(st.peak!=null)IDEALPEAK=+st.peak;
+  // refresh readouts
+  $('vMach').textContent=(+$('sMach').value).toFixed(2);
+  $('vAlt').textContent=(+$('sAlt').value/1000).toFixed(1)+' km';
+  $('vAoa').textContent=(+$('sAoa').value).toFixed(1)+'°';
+  $('vCg').textContent=$('sCg').value+'%';
+  $('vWd').textContent=(+$('sWd').value).toFixed(2);
+  $('vW').textContent=$('sW').value; $('vT').textContent=$('sT').value;
+  if($('peakLab'))$('peakLab').textContent='peak '+(IDEALPEAK<0.55?'0.50':'0.67')+'L';
+  if(RAWTRIS)rebuild(); else if(GEO)recompute();   // rebuild re-analyzes with restored axis/nose
+}
+$('bSaveState').addEventListener('click',saveState);
+// auto-calibrate wave drag against the Sears-Haack ideal (arEff), not against total drag.
+// real well-area-ruled bodies sit ~1.5-2x the Sears-Haack minimum (arEff 0.50-0.67).
+// designs already in that band are left alone (preserving geometric discrimination);
+// only physically implausible outliers are pulled to the nearest band edge.
+const AR_LO=0.50, AR_HI=0.667;   // arEff band = 1/(2.0x .. 1.5x Sears-Haack)
+function autoScaleWave(){
+  const note=$('wdCalNote');
+  if(!GEO){if(note)note.textContent='load a model first';return;}
+  const DqW0=waveDragFaired(GEO.Sx,GEO.Llen,GEO.Abase);
+  // measure the raw geometric ratio at wdScale=1, supersonic (transonic blend fully on -> clean ratio)
+  const r=aero(GEO,1.5,11000,+$('sCg').value,0,+$('sT').value,$('engType').value,1,DqW0);
+  if(!(r.CDw>1e-9)||!(r.CDwIdeal>1e-12)){if(note)note.textContent='no wave drag to calibrate';return;}
+  const arEffRaw=r.CDwIdeal/r.CDw;                       // Sears-Haack ideal / computed actual, wdScale=1
+  let m, tgt;
+  if(arEffRaw<AR_LO){tgt=AR_LO; m=arEffRaw/AR_LO;}       // tool over-draggy -> scale down toward 2.0x SH
+  else if(arEffRaw>AR_HI){tgt=AR_HI; m=arEffRaw/AR_HI;}  // implausibly good -> scale up toward 1.5x SH
+  else{tgt=arEffRaw; m=1;}                                // already plausible -> trust the geometry
+  const mc=clamp(m,0.2,1.8), clamped=Math.abs(mc-m)>1e-6;
+  const s=$('sWd'); s.value=mc.toFixed(2); $('vWd').textContent=(+s.value).toFixed(2);
+  recompute();
+  const xSH=(1/arEffRaw).toFixed(1);
+  if(note) note.textContent = (m===1)
+    ? 'geom '+xSH+'× SH — plausible, left ×1.00'
+    : 'geom '+xSH+'× SH → '+(1/tgt).toFixed(1)+'× (×'+mc.toFixed(2)+(clamped?' clamped':'')+')';
+}
+$('bAutoWd').addEventListener('click',autoScaleWave);
+$('bLoadWd').addEventListener('click',()=>{
+  if(WDTABLE){WDTABLE=null;$('wdTabNote').textContent='';$('bLoadWd').textContent='↧ load .json';$('bCompWd').textContent='⚙ Compute Jones DqW(M)';recompute();}
+  else $('wdFile').click();
+});
+$('wdFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{try{const j=JSON.parse(rd.result);
+    if(!Array.isArray(j.mach)||!Array.isArray(j.shape)||j.mach.length!==j.shape.length||j.mach.length<2)throw 0;
+    WDTABLE={mach:j.mach.map(Number),shape:j.shape.map(Number)};
+    $('wdTabNote').innerHTML='Jones table M'+j.mach[0]+'–'+j.mach[j.mach.length-1]+' · '+j.mach.length+' pts · click to clear';
+    $('bLoadWd').textContent='✕ Jones DqW(M)';
+    recompute();
+  }catch(_){$('wdTabNote').textContent='invalid table JSON';}};
+  rd.readAsText(f);e.target.value='';});
+$('bCompWd').addEventListener('click',()=>{
+  if(!GEO){$('wdTabNote').textContent='load a model first';return;}
+  if(WDTABLE){WDTABLE=null;$('bCompWd').textContent='⚙ Compute Jones DqW(M)';$('bLoadWd').textContent='↧ load .json';$('wdTabNote').textContent='';$('wdTabNote').style.color='var(--cyan)';recompute();return;}
+  $('spin').classList.add('on');$('spinTxt').textContent='JONES WAVE DRAG';
+  setTimeout(()=>{let tab=null;try{tab=computeJonesTable();}catch(_){}
+    $('spin').classList.remove('on');
+    if(!tab){$('wdTabNote').textContent='compute failed';return;}
+    WDTABLE={mach:tab.mach,shape:tab.shape};$('bCompWd').textContent='✕ Jones DqW(M) on';
+    if(tab.badFrac>0.05){$('wdTabNote').innerHTML='⚠ mesh not watertight ('+Math.round(tab.badFrac*100)+'% open cuts) — enable Voxel cleanup & recompute; result unreliable';$('wdTabNote').style.color='var(--red)';}
+    else{$('wdTabNote').innerHTML='Jones M'+tab.mach[0]+'–'+tab.mach[tab.mach.length-1]+' · computed in-browser (exact sections)';$('wdTabNote').style.color='var(--cyan)';}
+    recompute();
+  },30);
+});
+$('sRcsK').addEventListener('input',()=>{RCS_K=+$('sRcsK').value;updateRcsK();drawRCS();});
+document.querySelectorAll('.rcsp').forEach(b=>b.addEventListener('click',()=>{RCS_K=parseFloat(b.dataset.k);$('sRcsK').value=RCS_K;updateRcsK();drawRCS();}));
+document.querySelectorAll('.rcsmode').forEach(b=>b.addEventListener('click',()=>{
+  RCS_MODE=b.dataset.m;
+  document.querySelectorAll('.rcsmode').forEach(z=>{const on=z.dataset.m===RCS_MODE;z.style.color=on?'#ff9d3c':'';z.style.borderColor=on?'#ff9d3c':'';});
+  $('rcsProjCtrls').style.display=RCS_MODE==='proj'?'':'none';
+  $('sbrCtrls').style.display=RCS_MODE==='sbr'?'':'none';
+  $('rcsNote').innerHTML=RCS_MODE==='sbr'
+    ?'Shoot-and-bounce: rays from each aspect reflect specularly up to N bounces; returns binned into a per-facet lobe (width set by wavelength ÷ facet size). Captures specular angle-dependence, corner/cavity retroreflection and shadowing the projected proxy misses. Incoherent — a <b>relative</b> dB envelope, not calibrated absolute RCS; no interference nulls or edge diffraction. One-shot compute; dense meshes take a few seconds.'
+    :'Projected silhouette Σ(n·r̂)·A scaled by 10^K (metres). Fast proxy — planform exposure only; no specular spikes, corners, frequency or RAM. K presets stand in heuristically.';
+  drawRCS();
+}));
+$('sbrBand').addEventListener('change',()=>{RCS_LAM=+$('sbrBand').value;if(RCS_EDGES_ON){computeEdgeSpec();updateEdgeNote();drawRCS();}});
+$('bEdge').addEventListener('click',()=>{RCS_EDGES_ON=!RCS_EDGES_ON;const b=$('bEdge');b.style.color=RCS_EDGES_ON?'#c77dff':'';b.style.borderColor=RCS_EDGES_ON?'#c77dff':'';if(RCS_EDGES_ON)computeEdgeSpec();updateEdgeNote();drawRCS();});
+$('sbrRefl').addEventListener('input',()=>{$('vSbrR').textContent=(+$('sbrRefl').value).toFixed(2);});
+$('bSbr').addEventListener('click',()=>{if(!GEO)return;const btn=$('bSbr');btn.textContent='Computing…';btn.disabled=true;
+  setTimeout(()=>{try{sbrSweep();}catch(e){console.error(e);}btn.textContent='Compute ray-trace RCS';btn.disabled=false;},30);});
+document.querySelectorAll('.rcsmode').forEach(z=>{const on=z.dataset.m==='proj';z.style.color=on?'#ff9d3c':'';z.style.borderColor=on?'#ff9d3c':'';});
+updateRcsK();
+$('bLoadState').addEventListener('click',()=>$('stateFile').click());
+$('stateFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{try{applyState(JSON.parse(rd.result));}catch(err){alert('Could not read that state file.');}};
+  rd.readAsText(f); e.target.value='';});
+$('bLoad').addEventListener('click',()=>$('file').click());
+$('file').addEventListener('change',e=>{const f=e.target.files[0];if(f)readFile(f);});
+function readFile(f){const r=new FileReader();$('spin').classList.add('on');$('spinTxt').textContent='READING '+f.name;
+  r.onload=()=>{try{const tris=parseSTL(r.result);loadTris(tris);}catch(err){$('spinTxt').textContent='PARSE ERROR';setTimeout(()=>$('spin').classList.remove('on'),1500);}};
+  r.readAsArrayBuffer(f);}
+// drag & drop
+const stage=$('stage'),drop=$('drop');
+['dragenter','dragover'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('on');}));
+['dragleave','drop'].forEach(ev=>stage.addEventListener(ev,e=>{e.preventDefault();if(ev==='drop'){const f=e.dataTransfer.files[0];if(f)readFile(f);}drop.classList.remove('on');}));
+
+/* ===== two-slot card selector (declutter: pick which analysis fills each of two cards) ===== */
+function slotSetup(){
+  const side=$('side');
+  const cards=[...side.querySelectorAll(':scope > .card')];
+  if(cards.length<2)return;
+  const pool=document.createElement('div');pool.id='cardPool';pool.style.display='none';
+  const CARDMAP={};
+  const meta=cards.map((c,i)=>{
+    const h=c.querySelector('h3');
+    const name=(h&&h.childNodes[0])?h.childNodes[0].textContent.trim():('Card '+(i+1));
+    const key='card'+i;c.dataset.cardKey=key;CARDMAP[key]={name,el:c};pool.appendChild(c);
+    return {key,name};
+  });
+  side.appendChild(pool);
+  const SLOTKEY=[null,null],SLOTSEL=[null,null],SLOTBODY=[null,null];
+  function redraw(){requestAnimationFrame(()=>{try{recompute();}catch(e){}try{if(RCSDATA)drawRCS();}catch(e){}});}
+  function selectCard(idx,key){
+    const other=1-idx;
+    if(SLOTKEY[other]===key){                       // requested card is in the other slot -> swap
+      const mine=SLOTKEY[idx];SLOTKEY[other]=mine;SLOTSEL[other].value=mine;
+      if(mine)SLOTBODY[other].appendChild(CARDMAP[mine].el);
+    }else{                                           // park the card we're replacing back to the pool
+      const cur=SLOTKEY[idx];if(cur&&cur!==SLOTKEY[other])pool.appendChild(CARDMAP[cur].el);
+    }
+    SLOTKEY[idx]=key;SLOTBODY[idx].appendChild(CARDMAP[key].el);SLOTSEL[idx].value=key;redraw();
+  }
+  function mkSlot(idx){
+    const slot=document.createElement('div');slot.className='card slotCard';
+    const sel=document.createElement('select');sel.className='slotSel';
+    meta.forEach(m=>{const o=document.createElement('option');o.value=m.key;o.textContent=m.name;sel.appendChild(o);});
+    const body=document.createElement('div');body.className='slotBody';
+    slot.appendChild(sel);slot.appendChild(body);side.insertBefore(slot,pool);
+    sel.addEventListener('change',()=>selectCard(idx,sel.value));
+    SLOTSEL[idx]=sel;SLOTBODY[idx]=body;
+  }
+  mkSlot(0);mkSlot(1);
+  const findKey=nm=>{const m=meta.find(x=>x.name.toLowerCase().startsWith(nm));return m?m.key:null;};
+  const d0=findKey('performance')||meta[0].key;
+  let d1=findKey('drag vs mach')||findKey('flight envelope')||meta[1].key;
+  if(d1===d0)d1=(meta.find(m=>m.key!==d0)||meta[0]).key;
+  SLOTKEY[0]=d0;SLOTBODY[0].appendChild(CARDMAP[d0].el);SLOTSEL[0].value=d0;
+  SLOTKEY[1]=d1;SLOTBODY[1].appendChild(CARDMAP[d1].el);SLOTSEL[1].value=d1;
+  redraw();
+}
+initGL();
+slotSetup();
+</script>
+</body>
+</html>
